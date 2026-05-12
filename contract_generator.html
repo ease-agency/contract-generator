@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oproepovereenkomst Generator – Ease-Agency</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f4f3ef;
+    color: #1a1a1a;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .container { max-width: 680px; margin: 0 auto; }
+
+  header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 1.75rem;
+  }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: #185FA5; display: flex; align-items: center; justify-content: center;
+  }
+  .logo svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+  header h1 { font-size: 16px; font-weight: 600; color: #111; }
+  header p { font-size: 12px; color: #888; margin-top: 1px; }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e5e3de;
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #999;
+    margin-bottom: 1rem;
+  }
+
+  /* Paste zone */
+  .paste-zone {
+    background: #f9f8f5;
+    border: 1.5px dashed #d0cdc5;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .paste-zone:focus-within { border-color: #185FA5; background: #f0f6ff; }
+  .paste-zone label { font-size: 12px; font-weight: 500; color: #555; display: block; margin-bottom: 6px; }
+  .paste-zone textarea {
+    width: 100%; border: none; background: transparent; resize: none;
+    font-size: 13px; color: #333; outline: none; font-family: inherit;
+    min-height: 48px; line-height: 1.5;
+  }
+  .paste-zone textarea::placeholder { color: #bbb; }
+  .paste-hint { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3-1 { display: grid; grid-template-columns: 3fr 1fr; gap: 12px; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: #777; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .badge-auto {
+    background: #e8f1fb; color: #185FA5;
+    font-size: 10px; padding: 1px 6px; border-radius: 5px; font-weight: 600;
+  }
+  .badge-eq {
+    background: #eaf7f0; color: #1a7a4a;
+    font-size: 10px; padding: 1px 6px; border-radius: 5px; font-weight: 600;
+  }
+
+  input[type="text"], input[type="date"], input[type="number"], select {
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid #e0ddd7;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #111;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:focus, select:focus {
+    border-color: #185FA5;
+    box-shadow: 0 0 0 3px rgba(24,95,165,0.1);
+  }
+  input.error { border-color: #e24b4a; box-shadow: 0 0 0 3px rgba(226,75,74,0.1); }
+
+  .euro-wrap { position: relative; }
+  .euro-wrap input { padding-left: 30px; }
+  .euro-wrap::before {
+    content: '€';
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 13px; color: #888; pointer-events: none;
+  }
+
+  /* Error messages */
+  .err-msg { font-size: 11px; color: #e24b4a; margin-top: 2px; display: none; }
+  .err-msg.visible { display: block; }
+
+  /* Buttons */
+  .actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 0.25rem; }
+  .btn {
+    height: 38px; padding: 0 18px; border-radius: 9px; font-size: 13px;
+    font-family: inherit; font-weight: 500; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: opacity 0.15s, transform 0.1s;
+    border: 1px solid transparent;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-secondary {
+    background: #fff; color: #555; border-color: #e0ddd7;
+  }
+  .btn-secondary:hover { background: #f4f3ef; }
+  .btn-primary {
+    background: #185FA5; color: #fff; border-color: #185FA5;
+  }
+  .btn-primary:hover { background: #1450890; opacity: 0.92; }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1a1a1a; color: #fff; font-size: 13px; padding: 10px 18px;
+    border-radius: 10px; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.error { background: #e24b4a; }
+
+  @media (max-width: 500px) {
+    .grid-2, .grid-3-1, .grid-1-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </div>
+    <div>
+      <h1>Oproepovereenkomst bepaalde tijd</h1>
+      <p>Ease-Agency B.V.</p>
+    </div>
+  </header>
+
+  <!-- Paste zone -->
+  <div class="card">
+    <div class="card-title">Gegevens plakken vanuit Excel</div>
+    <div class="paste-zone">
+      <label for="paste-input">Kopieer een rij uit Excel en plak hier</label>
+      <textarea id="paste-input" rows="2" placeholder="Tijdstempel&#9;Volledige naam&#9;Geboortedatum&#9;E-mailadres&#9;Telefoonnummer&#9;Adres + Woonplaats"></textarea>
+    </div>
+    <p class="paste-hint">Kolommen worden automatisch herkend: naam, geboortedatum, adres + woonplaats worden ingevuld.</p>
+  </div>
+
+  <!-- Persoonsgegevens -->
+  <div class="card">
+    <div class="card-title">Persoonsgegevens werknemer</div>
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;margin-bottom:12px;">
+      <div class="field">
+        <label for="aanhef">Aanhef</label>
+        <select id="aanhef">
+          <option value="Mevrouw">Mevrouw</option>
+          <option value="De heer">De heer</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="naam">Volledige naam</label>
+        <input type="text" id="naam" placeholder="bijv. Anna de Vries">
+        <span class="err-msg" id="err-naam">Vul een naam in</span>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-bottom:12px;">
+      <div class="field">
+        <label for="geboortedatum">Geboortedatum</label>
+        <input type="date" id="geboortedatum">
+        <span class="err-msg" id="err-geboortedatum">Vul een geboortedatum in</span>
+      </div>
+      <div class="field">
+        <label for="woonplaats">Woonplaats</label>
+        <input type="text" id="woonplaats" placeholder="bijv. Amsterdam">
+        <span class="err-msg" id="err-woonplaats">Vul een woonplaats in</span>
+      </div>
+    </div>
+    <div class="grid-1-2">
+      <div class="field">
+        <label for="postcode">Postcode</label>
+        <input type="text" id="postcode" placeholder="1234 AB">
+        <span class="err-msg" id="err-postcode">Vul een postcode in</span>
+      </div>
+      <div class="field">
+        <label for="adres">Adres (straat + huisnummer)</label>
+        <input type="text" id="adres" placeholder="Sarphatistraat 72">
+        <span class="err-msg" id="err-adres">Vul een adres in</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dienstverband -->
+  <div class="card">
+    <div class="card-title">Dienstverband</div>
+    <div class="grid-2" style="margin-bottom:12px;">
+      <div class="field">
+        <label for="startdatum">Startdatum</label>
+        <input type="date" id="startdatum">
+        <span class="err-msg" id="err-startdatum">Vul een startdatum in</span>
+      </div>
+      <div class="field">
+        <label for="einddatum">
+          Einddatum
+          <span class="badge-auto" id="badge-eind" style="display:none;">auto</span>
+        </label>
+        <input type="date" id="einddatum">
+        <span class="err-msg" id="err-einddatum">Vul een einddatum in</span>
+      </div>
+    </div>
+    <div class="field" style="max-width:50%;">
+      <label for="tekendatum">Tekendatum</label>
+      <input type="date" id="tekendatum">
+      <span class="err-msg" id="err-tekendatum">Vul een tekendatum in</span>
+    </div>
+  </div>
+
+  <!-- Salaris -->
+  <div class="card">
+    <div class="card-title">Salaris</div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="uurloondatum">
+          Ingangsdatum uurloon
+          <span class="badge-eq" id="badge-uurloon" style="display:none;">= startdatum</span>
+        </label>
+        <input type="date" id="uurloondatum">
+        <span class="err-msg" id="err-uurloondatum">Vul een ingangsdatum in</span>
+      </div>
+      <div class="field">
+        <label for="uurloon">Bruto uurloon</label>
+        <div class="euro-wrap">
+          <input type="number" id="uurloon" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <span class="err-msg" id="err-uurloon">Vul een uurloon in</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="resetForm()">Leegmaken</button>
+    <button class="btn btn-primary" id="btn-generate" onclick="generateContract()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Contract genereren
+    </button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// Template wordt geladen als los bestand (template.docx)
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+function toInputDate(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function formatNL(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  return `${parseInt(d)}-${parseInt(m)}-${y}`;
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isError ? ' error' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = '', 3000);
+}
+
+// ─── Date logic ───────────────────────────────────────────────────────────
+const startEl = document.getElementById('startdatum');
+const eindEl = document.getElementById('einddatum');
+const uurloondatumEl = document.getElementById('uurloondatum');
+const badgeEind = document.getElementById('badge-eind');
+const badgeUurloon = document.getElementById('badge-uurloon');
+
+let eindWasAuto = false;
+let uurloonWasAuto = false;
+
+startEl.addEventListener('change', () => {
+  const val = startEl.value;
+  if (!val) return;
+
+  // Parse date parts directly to avoid timezone shifts
+  const [sy, sm, sd] = val.split('-').map(Number);
+
+  // Einddatum: start + 1 jaar - 1 dag (puur met getallen, geen UTC-shift)
+  let ey = sy + 1, em = sm, ed = sd - 1;
+  if (ed === 0) {
+    em -= 1;
+    if (em === 0) { em = 12; ey -= 1; }
+    ed = new Date(ey, em, 0).getDate(); // laatste dag van vorige maand
+  }
+  const eindStr = `${ey}-${String(em).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
+  eindEl.value = eindStr;
+  badgeEind.style.display = 'inline';
+  eindWasAuto = true;
+
+  // Uurloondatum = startdatum
+  uurloondatumEl.value = val;
+  badgeUurloon.style.display = 'inline';
+  uurloonWasAuto = true;
+});
+
+eindEl.addEventListener('change', () => {
+  if (eindWasAuto) { eindWasAuto = false; badgeEind.style.display = 'none'; }
+});
+uurloondatumEl.addEventListener('change', () => {
+  if (uurloonWasAuto) { uurloonWasAuto = false; badgeUurloon.style.display = 'none'; }
+});
+
+// ─── Paste from Excel ─────────────────────────────────────────────────────
+document.getElementById('paste-input').addEventListener('paste', (e) => {
+  setTimeout(() => parsePaste(e.target.value), 0);
+});
+document.getElementById('paste-input').addEventListener('input', (e) => {
+  parsePaste(e.target.value);
+});
+
+function parsePaste(raw) {
+  if (!raw.trim()) return;
+  const cols = raw.split('\t').map(c => c.trim());
+  // Expected: Tijdstempel | Volledige naam | Geboortedatum | E-mailadres | Telefoonnummer | Adres + Woonplaats
+  if (cols.length < 2) return;
+
+  // Naam = col 1
+  if (cols[1]) document.getElementById('naam').value = cols[1];
+
+  // Geboortedatum = col 2 (format: d-m-yyyy)
+  if (cols[2]) {
+    const parts = cols[2].split('-');
+    if (parts.length === 3) {
+      const d = parts[0].padStart(2,'0');
+      const m = parts[1].padStart(2,'0');
+      const y = parts[2];
+      document.getElementById('geboortedatum').value = `${y}-${m}-${d}`;
+    }
+  }
+
+  // Adres + Woonplaats = col 5 — parse last word as city, rest as address
+  if (cols[5]) {
+    const parts = cols[5].trim().split(' ');
+    if (parts.length >= 2) {
+      const city = parts[parts.length - 1];
+      const street = parts.slice(0, -1).join(' ');
+      document.getElementById('adres').value = street;
+      document.getElementById('woonplaats').value = city;
+    }
+  }
+}
+
+// ─── Validation ───────────────────────────────────────────────────────────
+const REQUIRED = [
+  { id: 'naam', err: 'err-naam' },
+  { id: 'geboortedatum', err: 'err-geboortedatum' },
+  { id: 'woonplaats', err: 'err-woonplaats' },
+  { id: 'postcode', err: 'err-postcode' },
+  { id: 'adres', err: 'err-adres' },
+  { id: 'startdatum', err: 'err-startdatum' },
+  { id: 'einddatum', err: 'err-einddatum' },
+  { id: 'tekendatum', err: 'err-tekendatum' },
+  { id: 'uurloondatum', err: 'err-uurloondatum' },
+  { id: 'uurloon', err: 'err-uurloon' },
+];
+
+function validate() {
+  let ok = true;
+  REQUIRED.forEach(({ id, err }) => {
+    const el = document.getElementById(id);
+    const errEl = document.getElementById(err);
+    if (!el.value.trim()) {
+      el.classList.add('error');
+      errEl.classList.add('visible');
+      ok = false;
+    } else {
+      el.classList.remove('error');
+      errEl.classList.remove('visible');
+    }
+  });
+  return ok;
+}
+
+// Clear error on input
+REQUIRED.forEach(({ id, err }) => {
+  document.getElementById(id).addEventListener('input', () => {
+    document.getElementById(id).classList.remove('error');
+    document.getElementById(err).classList.remove('visible');
+  });
+});
+
+// ─── Reset ─────────────────────────────────────────────────────────────────
+function resetForm() {
+  document.getElementById('paste-input').value = '';
+  document.getElementById('aanhef').value = 'Mevrouw';
+  REQUIRED.forEach(({ id, err }) => {
+    document.getElementById(id).value = '';
+    document.getElementById(id).classList.remove('error');
+    document.getElementById(err).classList.remove('visible');
+  });
+  badgeEind.style.display = 'none';
+  badgeUurloon.style.display = 'none';
+}
+
+// ─── Generate ──────────────────────────────────────────────────────────────
+async function generateContract() {
+  if (!validate()) {
+    showToast('Vul alle verplichte velden in', true);
+    return;
+  }
+
+  if (typeof JSZip === 'undefined') {
+    showToast('JSZip laadt nog, probeer opnieuw', true);
+    return;
+  }
+
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  btn.textContent = 'Genereren…';
+
+  try {
+    // Compute EINDDATUM_PLUS1 (puur met datumonderdelen, geen timezone-shift)
+    const eindVal = document.getElementById('einddatum').value;
+    const [ey, em, ed] = eindVal.split('-').map(Number);
+    let p1d = ed + 1, p1m = em, p1y = ey;
+    const daysInMonth = new Date(p1y, p1m, 0).getDate();
+    if (p1d > daysInMonth) { p1d = 1; p1m += 1; }
+    if (p1m > 12) { p1m = 1; p1y += 1; }
+    const eindPlus1Str = `${p1y}-${String(p1m).padStart(2,'0')}-${String(p1d).padStart(2,'0')}`;
+
+    const uurloonVal = parseFloat(document.getElementById('uurloon').value).toFixed(2).replace('.', ',');
+
+    const data = {
+      AANHEF: document.getElementById('aanhef').value,
+      NAAM: document.getElementById('naam').value,
+      GEBOORTEDATUM: formatNL(document.getElementById('geboortedatum').value),
+      WOONPLAATS: document.getElementById('woonplaats').value,
+      POSTCODE: document.getElementById('postcode').value,
+      ADRES: document.getElementById('adres').value,
+      STARTDATUM: formatNL(document.getElementById('startdatum').value),
+      EINDDATUM: formatNL(eindVal),
+      EINDDATUM_PLUS1: formatNL(eindPlus1Str),
+      UURLOONDATUM: 'Per ' + formatNL(document.getElementById('uurloondatum').value),
+      UURLOON: '€ ' + uurloonVal,
+      TEKENDATUM: formatNL(document.getElementById('tekendatum').value),
+    };
+
+    // Load template from separate file in repository
+    const response = await fetch('template.docx');
+    if (!response.ok) throw new Error('Template niet gevonden');
+    const arrayBuffer = await response.arrayBuffer();
+
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    // Replace in document.xml
+    const docFile = zip.file('word/document.xml');
+    let xml = await docFile.async('string');
+
+    for (const [key, value] of Object.entries(data)) {
+      xml = xml.split(`{{${key}}}`).join(escapeXml(value));
+    }
+
+    zip.file('word/document.xml', xml);
+
+    // Generate and download
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const naam = data.NAAM.replace(/\s+/g, '_');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Oproepovereenkomst_${naam}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showToast('Contract gegenereerd!');
+  } catch (e) {
+    console.error(e);
+    showToast('Er ging iets mis bij het genereren', true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Contract genereren';
+  }
+}
+
+function escapeXml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+</script>
+</body>
+</html>
