@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -5,6 +6,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Oproepovereenkomst Generator – Ease-Agency</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// Fallback: load JSZip from unpkg if cdnjs fails
+window.addEventListener('load', () => {
+  if (typeof JSZip === 'undefined') {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js';
+    document.head.appendChild(s);
+  }
+});
+</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -306,13 +317,19 @@ let uurloonWasAuto = false;
 startEl.addEventListener('change', () => {
   const val = startEl.value;
   if (!val) return;
-  const start = new Date(val + 'T00:00:00');
 
-  // Einddatum: start + 1 jaar - 1 dag
-  const eind = new Date(start);
-  eind.setFullYear(eind.getFullYear() + 1);
-  eind.setDate(eind.getDate() - 1);
-  eindEl.value = toInputDate(eind);
+  // Parse date parts directly to avoid timezone shifts
+  const [sy, sm, sd] = val.split('-').map(Number);
+
+  // Einddatum: start + 1 jaar - 1 dag (puur met getallen, geen UTC-shift)
+  let ey = sy + 1, em = sm, ed = sd - 1;
+  if (ed === 0) {
+    em -= 1;
+    if (em === 0) { em = 12; ey -= 1; }
+    ed = new Date(ey, em, 0).getDate(); // laatste dag van vorige maand
+  }
+  const eindStr = `${ey}-${String(em).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
+  eindEl.value = eindStr;
   badgeEind.style.display = 'inline';
   eindWasAuto = true;
 
@@ -428,15 +445,24 @@ async function generateContract() {
     return;
   }
 
+  if (typeof JSZip === 'undefined') {
+    showToast('JSZip laadt nog, probeer opnieuw', true);
+    return;
+  }
+
   const btn = document.getElementById('btn-generate');
   btn.disabled = true;
   btn.textContent = 'Genereren…';
 
   try {
-    // Compute EINDDATUM_PLUS1
+    // Compute EINDDATUM_PLUS1 (puur met datumonderdelen, geen timezone-shift)
     const eindVal = document.getElementById('einddatum').value;
-    const eindPlus1 = new Date(eindVal + 'T00:00:00');
-    eindPlus1.setDate(eindPlus1.getDate() + 1);
+    const [ey, em, ed] = eindVal.split('-').map(Number);
+    let p1d = ed + 1, p1m = em, p1y = ey;
+    const daysInMonth = new Date(p1y, p1m, 0).getDate();
+    if (p1d > daysInMonth) { p1d = 1; p1m += 1; }
+    if (p1m > 12) { p1m = 1; p1y += 1; }
+    const eindPlus1Str = `${p1y}-${String(p1m).padStart(2,'0')}-${String(p1d).padStart(2,'0')}`;
 
     const uurloonVal = parseFloat(document.getElementById('uurloon').value).toFixed(2).replace('.', ',');
 
@@ -449,7 +475,7 @@ async function generateContract() {
       ADRES: document.getElementById('adres').value,
       STARTDATUM: formatNL(document.getElementById('startdatum').value),
       EINDDATUM: formatNL(eindVal),
-      EINDDATUM_PLUS1: formatNL(toInputDate(eindPlus1)),
+      EINDDATUM_PLUS1: formatNL(eindPlus1Str),
       UURLOONDATUM: 'Per ' + formatNL(document.getElementById('uurloondatum').value),
       UURLOON: '€ ' + uurloonVal,
       TEKENDATUM: formatNL(document.getElementById('tekendatum').value),
