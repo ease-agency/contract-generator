@@ -3,162 +3,156 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Oproepovereenkomst Generator – Ease-Agency</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
+<title>Contract Generator – Ease-Agency</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #f4f3ef;
-    color: #1a1a1a;
-    min-height: 100vh;
-    padding: 2rem 1rem;
-  }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f4f3ef;
+  color: #1a1a1a;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
 
-  .container { max-width: 680px; margin: 0 auto; }
+.container { max-width: 700px; margin: 0 auto; }
 
-  header {
-    display: flex; align-items: center; gap: 12px;
-    margin-bottom: 1.75rem;
-  }
-  .logo {
-    width: 40px; height: 40px; border-radius: 10px;
-    background: #185FA5; display: flex; align-items: center; justify-content: center;
-  }
-  .logo svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
-  header h1 { font-size: 16px; font-weight: 600; color: #111; }
-  header p { font-size: 12px; color: #888; margin-top: 1px; }
+header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 1.75rem;
+}
+.logo {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: #185FA5; display: flex; align-items: center; justify-content: center;
+}
+.logo svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+header h1 { font-size: 16px; font-weight: 600; color: #111; }
+header p { font-size: 12px; color: #888; margin-top: 1px; }
 
-  .card {
-    background: #fff;
-    border: 1px solid #e5e3de;
-    border-radius: 14px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
-  }
-  .card-title {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #999;
-    margin-bottom: 1rem;
-  }
+/* Contract type toggle */
+.type-toggle {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-bottom: 1rem;
+}
+.type-btn {
+  padding: 12px; border-radius: 10px; border: 1.5px solid #e0ddd7;
+  background: #fff; cursor: pointer; font-size: 13px; font-weight: 500;
+  color: #555; transition: all 0.15s; text-align: center; font-family: inherit;
+}
+.type-btn.active {
+  border-color: #185FA5; background: #f0f6ff; color: #185FA5;
+}
+.type-btn span { display: block; font-size: 11px; font-weight: 400; color: #999; margin-top: 2px; }
+.type-btn.active span { color: #185FA5; opacity: 0.7; }
 
-  /* Paste zone */
-  .paste-zone {
-    background: #f9f8f5;
-    border: 1.5px dashed #d0cdc5;
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    margin-bottom: 1rem;
-    transition: border-color 0.2s, background 0.2s;
-  }
-  .paste-zone:focus-within { border-color: #185FA5; background: #f0f6ff; }
-  .paste-zone label { font-size: 12px; font-weight: 500; color: #555; display: block; margin-bottom: 6px; }
-  .paste-zone textarea {
-    width: 100%; border: none; background: transparent; resize: none;
-    font-size: 13px; color: #333; outline: none; font-family: inherit;
-    min-height: 48px; line-height: 1.5;
-  }
-  .paste-zone textarea::placeholder { color: #bbb; }
-  .paste-hint { font-size: 11px; color: #aaa; margin-top: 4px; }
+.card {
+  background: #fff; border: 1px solid #e5e3de;
+  border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+}
+.card-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #999; margin-bottom: 1rem;
+}
 
-  /* Grid */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .grid-3-1 { display: grid; grid-template-columns: 3fr 1fr; gap: 12px; }
-  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
-  .field { display: flex; flex-direction: column; gap: 4px; }
-  .field label { font-size: 12px; color: #777; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-  .badge-auto {
-    background: #e8f1fb; color: #185FA5;
-    font-size: 10px; padding: 1px 6px; border-radius: 5px; font-weight: 600;
-  }
-  .badge-eq {
-    background: #eaf7f0; color: #1a7a4a;
-    font-size: 10px; padding: 1px 6px; border-radius: 5px; font-weight: 600;
-  }
+.paste-zone {
+  background: #f9f8f5; border: 1.5px dashed #d0cdc5;
+  border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+.paste-zone:focus-within { border-color: #185FA5; background: #f0f6ff; }
+.paste-zone label { font-size: 12px; font-weight: 500; color: #555; display: block; margin-bottom: 6px; }
+.paste-zone textarea {
+  width: 100%; border: none; background: transparent; resize: none;
+  font-size: 13px; color: #333; outline: none; font-family: inherit;
+  min-height: 40px; line-height: 1.5;
+}
+.paste-zone textarea::placeholder { color: #bbb; }
+.paste-hint { font-size: 11px; color: #aaa; margin-top: 4px; }
 
-  input[type="text"], input[type="date"], input[type="number"], select {
-    width: 100%;
-    height: 36px;
-    padding: 0 10px;
-    border: 1px solid #e0ddd7;
-    border-radius: 8px;
-    font-size: 13px;
-    font-family: inherit;
-    color: #111;
-    background: #fff;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  input:focus, select:focus {
-    border-color: #185FA5;
-    box-shadow: 0 0 0 3px rgba(24,95,165,0.1);
-  }
-  input.error { border-color: #e24b4a; box-shadow: 0 0 0 3px rgba(226,75,74,0.1); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.grid-3 { display: grid; grid-template-columns: 120px 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; color: #777; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.badge-auto { background: #e8f1fb; color: #185FA5; font-size: 10px; padding: 1px 6px; border-radius: 5px; font-weight: 600; }
+.badge-eq { background: #eaf7f0; color: #1a7a4a; font-size: 10px; padding: 1px 6px; border-radius: 5px; font-weight: 600; }
 
-  .euro-wrap { position: relative; }
-  .euro-wrap input { padding-left: 30px; }
-  .euro-wrap::before {
-    content: '€';
-    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-    font-size: 13px; color: #888; pointer-events: none;
-  }
+input[type="text"], input[type="date"], input[type="number"], select, textarea.form-input {
+  width: 100%; height: 36px; padding: 0 10px;
+  border: 1px solid #e0ddd7; border-radius: 8px;
+  font-size: 13px; font-family: inherit; color: #111;
+  background: #fff; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus, select:focus { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+input.error { border-color: #e24b4a; box-shadow: 0 0 0 3px rgba(226,75,74,0.1); }
 
-  /* Error messages */
-  .err-msg { font-size: 11px; color: #e24b4a; margin-top: 2px; display: none; }
-  .err-msg.visible { display: block; }
+.euro-wrap { position: relative; }
+.euro-wrap input { padding-left: 30px; }
+.euro-wrap::before { content: '€'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #888; pointer-events: none; }
 
-  /* Buttons */
-  .actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 0.25rem; }
-  .btn {
-    height: 38px; padding: 0 18px; border-radius: 9px; font-size: 13px;
-    font-family: inherit; font-weight: 500; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 7px;
-    transition: opacity 0.15s, transform 0.1s;
-    border: 1px solid transparent;
-  }
-  .btn:active { transform: scale(0.97); }
-  .btn-secondary {
-    background: #fff; color: #555; border-color: #e0ddd7;
-  }
-  .btn-secondary:hover { background: #f4f3ef; }
-  .btn-primary {
-    background: #185FA5; color: #fff; border-color: #185FA5;
-  }
-  .btn-primary:hover { background: #1450890; opacity: 0.92; }
-  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.err-msg { font-size: 11px; color: #e24b4a; margin-top: 2px; display: none; }
+.err-msg.visible { display: block; }
 
-  /* Toast */
-  #toast {
-    position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: #1a1a1a; color: #fff; font-size: 13px; padding: 10px 18px;
-    border-radius: 10px; opacity: 0; pointer-events: none;
-    transition: opacity 0.2s, transform 0.2s;
-    white-space: nowrap;
-  }
-  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  #toast.error { background: #e24b4a; }
+.hidden { display: none !important; }
 
-  @media (max-width: 500px) {
-    .grid-2, .grid-3-1, .grid-1-2 { grid-template-columns: 1fr; }
-  }
+.actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 0.25rem; }
+.btn {
+  height: 38px; padding: 0 18px; border-radius: 9px; font-size: 13px;
+  font-family: inherit; font-weight: 500; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: all 0.15s; border: 1px solid transparent;
+}
+.btn:active { transform: scale(0.97); }
+.btn-secondary { background: #fff; color: #555; border-color: #e0ddd7; }
+.btn-secondary:hover { background: #f4f3ef; }
+.btn-primary { background: #185FA5; color: #fff; border-color: #185FA5; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+#toast {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: #1a1a1a; color: #fff; font-size: 13px; padding: 10px 18px;
+  border-radius: 10px; opacity: 0; pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s; white-space: nowrap; z-index: 999;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.error { background: #e24b4a; }
+
+@media (max-width: 500px) {
+  .grid-2, .grid-1-2, .grid-3 { grid-template-columns: 1fr; }
+  .type-toggle { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
 <div class="container">
+
   <header>
     <div class="logo">
-      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     </div>
     <div>
-      <h1>Oproepovereenkomst bepaalde tijd</h1>
+      <h1>Contract Generator</h1>
       <p>Ease-Agency B.V.</p>
     </div>
   </header>
+
+  <!-- Contract type -->
+  <div class="card">
+    <div class="card-title">Type contract</div>
+    <div class="type-toggle">
+      <button class="type-btn active" id="btn-oproep" onclick="setType('oproep')">
+        Oproepovereenkomst
+        <span>Variabele uren, uurloon</span>
+      </button>
+      <button class="type-btn" id="btn-minmax" onclick="setType('minmax')">
+        Min-max overeenkomst
+        <span>Garantie-uren, maandsalaris</span>
+      </button>
+    </div>
+  </div>
 
   <!-- Paste zone -->
   <div class="card">
@@ -167,13 +161,13 @@
       <label for="paste-input">Kopieer een rij uit Excel en plak hier</label>
       <textarea id="paste-input" rows="2" placeholder="Tijdstempel&#9;Volledige naam&#9;Geboortedatum&#9;E-mailadres&#9;Telefoonnummer&#9;Adres + Woonplaats"></textarea>
     </div>
-    <p class="paste-hint">Kolommen worden automatisch herkend: naam, geboortedatum, adres + woonplaats worden ingevuld.</p>
+    <p class="paste-hint">Naam, geboortedatum, adres en woonplaats worden automatisch ingevuld.</p>
   </div>
 
   <!-- Persoonsgegevens -->
   <div class="card">
     <div class="card-title">Persoonsgegevens werknemer</div>
-    <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;margin-bottom:12px;">
+    <div class="grid-3" style="margin-bottom:12px;">
       <div class="field">
         <label for="aanhef">Aanhef</label>
         <select id="aanhef">
@@ -218,6 +212,13 @@
     <div class="card-title">Dienstverband</div>
     <div class="grid-2" style="margin-bottom:12px;">
       <div class="field">
+        <label for="functie">Functietitel</label>
+        <input type="text" id="functie" value="Personal Assistant">
+      </div>
+      <div class="field" style="opacity:0;pointer-events:none;"></div>
+    </div>
+    <div class="grid-2" style="margin-bottom:12px;">
+      <div class="field">
         <label for="startdatum">Startdatum</label>
         <input type="date" id="startdatum">
         <span class="err-msg" id="err-startdatum">Vul een startdatum in</span>
@@ -231,16 +232,16 @@
         <span class="err-msg" id="err-einddatum">Vul een einddatum in</span>
       </div>
     </div>
-    <div class="field" style="max-width:50%;">
+    <div class="field" style="max-width:48%;">
       <label for="tekendatum">Tekendatum</label>
       <input type="date" id="tekendatum">
       <span class="err-msg" id="err-tekendatum">Vul een tekendatum in</span>
     </div>
   </div>
 
-  <!-- Salaris -->
-  <div class="card">
-    <div class="card-title">Salaris</div>
+  <!-- Salaris: oproep -->
+  <div class="card" id="card-oproep">
+    <div class="card-title">Salaris — oproep</div>
     <div class="grid-2">
       <div class="field">
         <label for="uurloondatum">
@@ -260,11 +261,45 @@
     </div>
   </div>
 
+  <!-- Salaris: minmax -->
+  <div class="card hidden" id="card-minmax">
+    <div class="card-title">Salaris & uren — min-max</div>
+    <div class="grid-2" style="margin-bottom:12px;">
+      <div class="field">
+        <label for="min-uren">Minimum uren per week</label>
+        <input type="number" id="min-uren" placeholder="bijv. 8" min="0" step="1">
+        <span class="err-msg" id="err-min-uren">Vul minimum uren in</span>
+      </div>
+      <div class="field">
+        <label for="max-uren">Maximum uren per week</label>
+        <input type="number" id="max-uren" placeholder="bijv. 40" min="0" step="1">
+        <span class="err-msg" id="err-max-uren">Vul maximum uren in</span>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="salarisdatum">
+          Ingangsdatum salaris
+          <span class="badge-eq" id="badge-salaris" style="display:none;">= startdatum</span>
+        </label>
+        <input type="date" id="salarisdatum">
+        <span class="err-msg" id="err-salarisdatum">Vul een ingangsdatum in</span>
+      </div>
+      <div class="field">
+        <label for="salaris">Bruto maandsalaris (40u)</label>
+        <div class="euro-wrap">
+          <input type="number" id="salaris" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <span class="err-msg" id="err-salaris">Vul een salaris in</span>
+      </div>
+    </div>
+  </div>
+
   <div class="actions">
     <button class="btn btn-secondary" onclick="resetForm()">Leegmaken</button>
-    <button class="btn btn-primary" id="btn-generate" onclick="generateContract()">
+    <button class="btn btn-primary" id="btn-generate" onclick="generatePDF()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Contract genereren
+      PDF genereren
     </button>
   </div>
 </div>
@@ -272,17 +307,186 @@
 <div id="toast"></div>
 
 <script>
-// Template wordt geladen als los bestand (template.docx)
+// ════════════════════════════════════════════════════════════════
+// CONTRACTTEKST — pas hier de artikelen aan
+// Gebruik {{PLACEHOLDER}} voor variabele gegevens
+// ════════════════════════════════════════════════════════════════
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-function toInputDate(d) {
-  return d.toISOString().split('T')[0];
+const INTRO_SHARED = [
+  { type: 'party', text: 'Ease-Agency B.V., gevestigd te Amsterdam, postcode 1017 JZ, aan de Prinsengracht 769, rechtsgeldig vertegenwoordigd door de eigenaren, mevrouw S.L.B. Wiesman, mevrouw F.E.E. Van Asbeck verder te noemen: "Werkgever";' },
+  { type: 'party', text: '{{AANHEF}} {{NAAM}}, geboortedatum {{GEBOORTEDATUM}}, wonende te {{WOONPLAATS}}, postcode {{POSTCODE}}, aan de {{ADRES}}, verder te noemen: "Werknemer";' },
+  { type: 'declare', text: 'Verklaren te zijn overeengekomen:' },
+];
+
+const ARTIKEL_1 = { nr: 1, titel: 'Indiensttreding', tekst: 'Werknemer treedt met ingang van {{STARTDATUM}} in dienst van de Werkgever in de functie van {{FUNCTIE}}.' };
+const ARTIKEL_2 = { nr: 2, titel: 'Proeftijd', tekst: 'Er geldt een proeftijd van 1 maand.' };
+const ARTIKEL_3_SHARED = { nr: 3, titel: 'Aard van de overeenkomst en opzegtermijn', tekst: 'De overeenkomst wordt aangegaan voor bepaalde tijd, voor een periode van 12 maanden en loopt tot en met {{EINDDATUM}} en eindigt aldus van rechtswege, zonder dat opzegging is vereist met ingang van {{EINDDATUM_PLUS1}}.\n\nDe Werknemer en de Werkgever kunnen de arbeidsovereenkomst tussentijds opzeggen met inachtneming van de wettelijke opzegtermijn. Er kan slechts tegen het einde van een kalendermaand schriftelijk worden opgezegd.' };
+
+const ARTIKEL_4_OPROEP = { nr: 4, titel: 'Arbeidsduur', tekst: 'De normale arbeidsduur binnen de onderneming bedraagt bij een fulltime dienstverband 40 uur per week. Werknemer zal werkzaam zijn als oproepkracht op basis van een oproepovereenkomst. Werkgever roept Werknemer uitsluitend op wanneer sprake is van werkzaamheden waarvoor Werknemer kan worden ingezet.\n\nWerknemer is verplicht aan een oproep door of namens Werkgever gegeven, gehoor te geven. Werknemer mag slechts weigeren aan een oproep gehoor te geven indien en voorzover hij/zij redelijkerwijs niet in staat is op de door Werkgever aangegeven tijden te werken.\n\nBeide partijen zullen in dit kader rekening houden met elkaars gerechtvaardigde belangen en regelmatig contact houden. Werknemer zal door hem/haar geplande vakanties tijdig aan Werkgever doorgeven. De oproepen zullen doorgaans schriftelijk of elektronisch geschieden.\n\nDe werktijden zullen, afhankelijk van de behoefte in het bedrijf, in onderling overleg tussen Werkgever en Werknemer worden vastgesteld.' };
+
+const ARTIKEL_4_MINMAX = { nr: 4, titel: 'Arbeidsomvang en werktijden (min-max)', tekst: 'De arbeidsovereenkomst wordt aangegaan voor een minimum van {{MIN_UREN}} uur per week en een maximum van {{MAX_UREN}} uur per week.\n\nWerkgever garandeert Werknemer betaling van het loon over het minimum aantal uren per week, ongeacht of deze uren daadwerkelijk worden gewerkt.\n\nWerknemer is verplicht het minimumaantal uren per week te werken. Indien binnen de eigen klantenportefeuille van Werknemer onvoldoende werkzaamheden beschikbaar zijn om het minimumaantal uren te realiseren, zal Werkgever zich inspannen om Werknemer vervangende of soortgelijke werkzaamheden aan te bieden.\n\nWerknemer kan slechts weigeren werkzaamheden te verrichten indien en voor zover zij redelijkerwijs niet in staat is om op de door Werkgever aangegeven tijden te werken. Partijen zullen bij de planning van werkzaamheden rekening houden met elkaars gerechtvaardigde belangen en hierover regelmatig overleg voeren. Werknemer zal geplande vakanties tijdig aan Werkgever doorgeven.\n\nVoor zover Werknemer meer werkt dan het minimumaantal uren, maar niet meer dan het maximumaantal uren, ontvangt Werknemer loon over de daadwerkelijk gewerkte uren. Indien Werknemer gedurende een periode structureel meer uren werkt dan het overeengekomen minimum, kan dit op grond van artikel 7:610b BW leiden tot een aanpassing van de arbeidsomvang.\n\nDe werktijden worden in onderling overleg vastgesteld, rekening houdend met de bedrijfsbehoefte en de beschikbaarheid van Werknemer.\n\nMeeruren boven het maximumaantal uren per week worden uitsluitend verricht na voorafgaande instemming van zowel Werkgever als Werknemer en worden afzonderlijk vastgelegd.' };
+
+const ARTIKEL_5_OPROEP = { nr: 5, titel: 'Salaris', tekst: 'Per {{UURLOONDATUM}} bedraagt het bruto uurloon {{UURLOON}} exclusief vakantiegeld en vakantiedagen.\n\nWerknemer heeft gedurende de eerste 6 maanden van de dienstbetrekking alleen recht op loon indien en voorzover hij/zij daadwerkelijk werkzaam is geweest. Art. 7:628 BW is gedurende de genoemde periode niet van toepassing.' };
+
+const ARTIKEL_5_MINMAX = { nr: 5, titel: 'Salaris', tekst: 'Per {{SALARISDATUM}} bedraagt het bruto maandsalaris {{SALARIS}} exclusief vakantiegeld en vakantiedagen, gebaseerd op een fulltime dienstverband van 40 uur per week. Het salaris zal naar rato worden berekend en aangepast op basis van het in de betreffende maand definitief vastgestelde aantal gewerkte uren.' };
+
+const ARTIKELEN_SHARED = [
+  { nr: 6, titel: 'Plaats van werkzaamheden', tekst: 'Werknemer verricht zijn werkzaamheden in beginsel in Amsterdam – Nederland. Werkgever heeft recht Werknemer elders binnen Nederland te werk te stellen ingeval het bedrijfsbelang dit naar oordeel van Werkgever wenselijk of noodzakelijk maakt.' },
+  { nr: 7, titel: 'Vakantiedagen', tekst: 'Het aantal vakantie-uren per jaar is 160 uur op basis van een fulltime dienstverband. De vakantie-uren worden opgebouwd naar evenredigheid van de duur van het dienstverband gedurende het kalenderjaar en het aantal gewerkte uren. Het aantal vakantie-uren wordt maandelijks uitbetaald met het salaris.' },
+  { nr: 8, titel: 'Vakantietoeslag', tekst: 'Werknemer ontvangt vakantiebijslag gelijk aan 8% over het verdiende salaris. De vakantiebijslag wordt maandelijks tegelijk met het gewone loon betaalbaar gesteld.' },
+  { nr: 9, titel: 'Cao', tekst: 'Er is geen cao van toepassing.' },
+  { nr: 10, titel: 'Pensioenfonds', tekst: 'Er wordt door de Werkgever geen pensioenregeling aangeboden.' },
+  { nr: 11, titel: 'Arbeidsongeschiktheid', tekst: 'In geval van afwezigheid, om welke reden dan ook, dient Werknemer zijn Werkgever hiervan op de hoogte stellen om uiterlijk 09.00 uur \'s-ochtends van dezelfde dag. Voor zover Werknemer op een ander adres dan het bovengenoemde adres wordt verpleegd, dient tevens het verpleegadres opgegeven te worden. Werknemer is gehouden volledige medewerking te verlenen aan een onderzoek uit te voeren door de bedrijfsgeneeskundige of Arbodienst van Werkgever en binnen de daarvoor gestelde termijn de door haar gevraagde gegevens of inlichtingen te verstrekken.' },
+  { nr: 12, titel: 'Geheimhoudingsplicht', tekst: 'De Werknemer is zowel tijdens als na beëindiging van de arbeidsovereenkomst verplicht tot geheimhouding van al hetgeen hij/zij in verband met de dienstbetrekking omtrent bedrijfsaangelegenheden bekend is geworden, voor zover hem dat is opgelegd of voor zover hij/zij weet of redelijkerwijs moet weten dat geheimhouding geboden is.' },
+  { nr: 13, titel: 'Algemene plichten', tekst: 'De Werknemer verbindt zich in het algemeen de opgedragen werkzaamheden naar beste weten en kunnen te verrichten.' },
+  { nr: 14, titel: 'Nevenwerkzaamheden', tekst: 'Werknemer meldt nevenwerkzaamheden voorafgaand aan Werkgever. Werkgever kan deze slechts verbieden indien sprake is van een objectieve rechtvaardigingsgrond, zoals strijd met bedrijfsbelangen, een belangenconflict, of risico\'s voor gezondheid en veiligheid.' },
+  { nr: 15, titel: 'Elektronische opgave salarisstrook, jaaropgave', tekst: 'Met het oog op het bepaalde in artikel 7:626 lid 4 van het Burgerlijk Wetboek, verklaart de Werknemer ermee in te stemmen dat de opgave als bedoeld in lid 1 van dat artikel (de loonstrook en jaaropgaaf) niet schriftelijk, maar op elektronische wijze wordt gedaan.' },
+  { nr: 16, titel: 'Ronselbeding', tekst: 'Het is Werknemer niet toegestaan tijdens of twee jaar na het einde van het dienstverband, direct dan wel indirect, zowel voor zichzelf als voor derden, Werknemers van Werkgever te benaderen teneinde hen te bewegen het dienstverband met Werkgever dan wel met een aan Werkgever gelieerde onderneming te beëindigen.' },
+  { nr: 17, titel: 'Zakelijke relaties', tekst: '1. Zonder voorafgaande schriftelijke toestemming van Werkgever zal Werknemer binnen één jaar na afloop van de arbeidsovereenkomst geen zakelijke relaties onderhouden of aangaan met actieve klanten, oud-klanten en leveranciers van Werkgever waarmee Werknemer tijdens de arbeidsovereenkomst direct of indirect contact heeft gehad.\n\n2. Werknemer zal tijdens de arbeidsovereenkomst geen zakenrelaties aangaan met relaties van Werkgever met als doel om na afloop van deze arbeidsovereenkomst zakelijke relaties aan te gaan voor eigen gewin.' },
+  { nr: 18, titel: 'Consequenties', tekst: '1. Indien Werknemer een verplichting uit deze arbeidsovereenkomst schendt, waaronder maar niet beperkt tot de bepalingen inzake geheimhouding (artikel 12), ronselbeding (artikel 16) en zakelijke relaties (artikel 17), kan Werkgever Werknemer een onmiddellijk opeisbare boete opleggen van € 5.000,00. Tevens is Werknemer een boete van € 500,00 verschuldigd voor elke dag dat de overtreding voortduurt.\n\n2. Het opleggen van een boete laat onverlet het recht van Werkgever om volledige vergoeding te vorderen van de daadwerkelijke schade die door de overtreding is ontstaan.' },
+  { nr: 19, titel: 'Diversen', tekst: '1. Deze arbeidsovereenkomst kan alleen schriftelijk worden gewijzigd.\n\n2. Alle bijlagen maken deel uit van deze arbeidsovereenkomst.\n\n3. Deze arbeidsovereenkomst vervangt alle eerdere afspraken die tussen partijen zijn gemaakt.' },
+  { nr: 20, titel: 'Exemplaar arbeidsovereenkomst', tekst: 'De Werknemer verklaart een getekend exemplaar van deze overeenkomst te hebben ontvangen.' },
+];
+
+// ════════════════════════════════════════════════════════════════
+// APPLICATIE LOGICA
+// ════════════════════════════════════════════════════════════════
+
+let contractType = 'oproep';
+
+function setType(type) {
+  contractType = type;
+  document.getElementById('btn-oproep').classList.toggle('active', type === 'oproep');
+  document.getElementById('btn-minmax').classList.toggle('active', type === 'minmax');
+  document.getElementById('card-oproep').classList.toggle('hidden', type !== 'oproep');
+  document.getElementById('card-minmax').classList.toggle('hidden', type !== 'minmax');
 }
 
-function formatNL(dateStr) {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  return `${parseInt(d)}-${parseInt(m)}-${y}`;
+// Date helpers
+function parseDate(val) {
+  if (!val) return null;
+  const [y, m, d] = val.split('-').map(Number);
+  return { y, m, d };
+}
+
+function formatNL({ y, m, d }) {
+  return `${d} ${['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'][m-1]} ${y}`;
+}
+
+function toInputVal(y, m, d) {
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+// Date logic
+const startEl = document.getElementById('startdatum');
+const eindEl = document.getElementById('einddatum');
+const uurloondatumEl = document.getElementById('uurloondatum');
+const salarisdatumEl = document.getElementById('salarisdatum');
+const badgeEind = document.getElementById('badge-eind');
+const badgeUurloon = document.getElementById('badge-uurloon');
+const badgeSalaris = document.getElementById('badge-salaris');
+
+let eindAuto = false, uurloonAuto = false, salarisAuto = false;
+
+startEl.addEventListener('change', () => {
+  const val = startEl.value;
+  if (!val) return;
+  const { y: sy, m: sm, d: sd } = parseDate(val);
+
+  // Einddatum = start + 1 jaar - 1 dag
+  let ey = sy + 1, em = sm, ed = sd - 1;
+  if (ed === 0) {
+    em--;
+    if (em === 0) { em = 12; ey--; }
+    ed = new Date(ey, em, 0).getDate();
+  }
+  eindEl.value = toInputVal(ey, em, ed);
+  badgeEind.style.display = 'inline';
+  eindAuto = true;
+
+  uurloondatumEl.value = val;
+  badgeUurloon.style.display = 'inline';
+  uurloonAuto = true;
+
+  salarisdatumEl.value = val;
+  badgeSalaris.style.display = 'inline';
+  salarisAuto = true;
+});
+
+eindEl.addEventListener('change', () => { eindAuto = false; badgeEind.style.display = 'none'; });
+uurloondatumEl.addEventListener('change', () => { uurloonAuto = false; badgeUurloon.style.display = 'none'; });
+salarisdatumEl.addEventListener('change', () => { salarisAuto = false; badgeSalaris.style.display = 'none'; });
+
+// Paste from Excel
+document.getElementById('paste-input').addEventListener('paste', e => setTimeout(() => parsePaste(e.target.value), 0));
+document.getElementById('paste-input').addEventListener('input', e => parsePaste(e.target.value));
+
+function parsePaste(raw) {
+  if (!raw.trim()) return;
+  const cols = raw.split('\t').map(c => c.trim());
+  if (cols.length < 2) return;
+  if (cols[1]) document.getElementById('naam').value = cols[1];
+  if (cols[2]) {
+    const parts = cols[2].split('-');
+    if (parts.length === 3) {
+      const d = parts[0].padStart(2,'0'), m = parts[1].padStart(2,'0'), y = parts[2];
+      document.getElementById('geboortedatum').value = `${y}-${m}-${d}`;
+    }
+  }
+  if (cols[5]) {
+    const parts = cols[5].trim().split(' ');
+    if (parts.length >= 2) {
+      document.getElementById('woonplaats').value = parts[parts.length - 1];
+      document.getElementById('adres').value = parts.slice(0, -1).join(' ');
+    }
+  }
+}
+
+// Validation
+const REQUIRED_COMMON = ['naam','geboortedatum','woonplaats','postcode','adres','startdatum','einddatum','tekendatum'];
+const REQUIRED_OPROEP = ['uurloondatum','uurloon'];
+const REQUIRED_MINMAX = ['min-uren','max-uren','salarisdatum','salaris'];
+
+function validate() {
+  let ok = true;
+  const fields = [...REQUIRED_COMMON, ...(contractType === 'oproep' ? REQUIRED_OPROEP : REQUIRED_MINMAX)];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    const errEl = document.getElementById('err-' + id);
+    if (!el || !el.value.trim()) {
+      if (el) el.classList.add('error');
+      if (errEl) errEl.classList.add('visible');
+      ok = false;
+    } else {
+      el.classList.remove('error');
+      if (errEl) errEl.classList.remove('visible');
+    }
+  });
+  return ok;
+}
+
+[...REQUIRED_COMMON, ...REQUIRED_OPROEP, ...REQUIRED_MINMAX].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', () => {
+    el.classList.remove('error');
+    const errEl = document.getElementById('err-' + id);
+    if (errEl) errEl.classList.remove('visible');
+  });
+});
+
+function resetForm() {
+  document.getElementById('paste-input').value = '';
+  document.getElementById('aanhef').value = 'Mevrouw';
+  document.getElementById('functie').value = 'Personal Assistant';
+  [...REQUIRED_COMMON, ...REQUIRED_OPROEP, ...REQUIRED_MINMAX].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el.classList.remove('error'); }
+    const errEl = document.getElementById('err-' + id);
+    if (errEl) errEl.classList.remove('visible');
+  });
+  badgeEind.style.display = 'none';
+  badgeUurloon.style.display = 'none';
+  badgeSalaris.style.display = 'none';
 }
 
 function showToast(msg, isError = false) {
@@ -290,230 +494,203 @@ function showToast(msg, isError = false) {
   t.textContent = msg;
   t.className = 'show' + (isError ? ' error' : '');
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.className = '', 3000);
+  t._timer = setTimeout(() => t.className = '', 3500);
 }
 
-// ─── Date logic ───────────────────────────────────────────────────────────
-const startEl = document.getElementById('startdatum');
-const eindEl = document.getElementById('einddatum');
-const uurloondatumEl = document.getElementById('uurloondatum');
-const badgeEind = document.getElementById('badge-eind');
-const badgeUurloon = document.getElementById('badge-uurloon');
+// ════════════════════════════════════════════════════════════════
+// PDF GENERATIE
+// ════════════════════════════════════════════════════════════════
 
-let eindWasAuto = false;
-let uurloonWasAuto = false;
-
-startEl.addEventListener('change', () => {
-  const val = startEl.value;
-  if (!val) return;
-
-  // Parse date parts directly to avoid timezone shifts
-  const [sy, sm, sd] = val.split('-').map(Number);
-
-  // Einddatum: start + 1 jaar - 1 dag (puur met getallen, geen UTC-shift)
-  let ey = sy + 1, em = sm, ed = sd - 1;
-  if (ed === 0) {
-    em -= 1;
-    if (em === 0) { em = 12; ey -= 1; }
-    ed = new Date(ey, em, 0).getDate(); // laatste dag van vorige maand
-  }
-  const eindStr = `${ey}-${String(em).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
-  eindEl.value = eindStr;
-  badgeEind.style.display = 'inline';
-  eindWasAuto = true;
-
-  // Uurloondatum = startdatum
-  uurloondatumEl.value = val;
-  badgeUurloon.style.display = 'inline';
-  uurloonWasAuto = true;
-});
-
-eindEl.addEventListener('change', () => {
-  if (eindWasAuto) { eindWasAuto = false; badgeEind.style.display = 'none'; }
-});
-uurloondatumEl.addEventListener('change', () => {
-  if (uurloonWasAuto) { uurloonWasAuto = false; badgeUurloon.style.display = 'none'; }
-});
-
-// ─── Paste from Excel ─────────────────────────────────────────────────────
-document.getElementById('paste-input').addEventListener('paste', (e) => {
-  setTimeout(() => parsePaste(e.target.value), 0);
-});
-document.getElementById('paste-input').addEventListener('input', (e) => {
-  parsePaste(e.target.value);
-});
-
-function parsePaste(raw) {
-  if (!raw.trim()) return;
-  const cols = raw.split('\t').map(c => c.trim());
-  // Expected: Tijdstempel | Volledige naam | Geboortedatum | E-mailadres | Telefoonnummer | Adres + Woonplaats
-  if (cols.length < 2) return;
-
-  // Naam = col 1
-  if (cols[1]) document.getElementById('naam').value = cols[1];
-
-  // Geboortedatum = col 2 (format: d-m-yyyy)
-  if (cols[2]) {
-    const parts = cols[2].split('-');
-    if (parts.length === 3) {
-      const d = parts[0].padStart(2,'0');
-      const m = parts[1].padStart(2,'0');
-      const y = parts[2];
-      document.getElementById('geboortedatum').value = `${y}-${m}-${d}`;
-    }
-  }
-
-  // Adres + Woonplaats = col 5 — parse last word as city, rest as address
-  if (cols[5]) {
-    const parts = cols[5].trim().split(' ');
-    if (parts.length >= 2) {
-      const city = parts[parts.length - 1];
-      const street = parts.slice(0, -1).join(' ');
-      document.getElementById('adres').value = street;
-      document.getElementById('woonplaats').value = city;
-    }
-  }
+function fillPlaceholders(text, data) {
+  return text.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] || `{{${key}}}`);
 }
 
-// ─── Validation ───────────────────────────────────────────────────────────
-const REQUIRED = [
-  { id: 'naam', err: 'err-naam' },
-  { id: 'geboortedatum', err: 'err-geboortedatum' },
-  { id: 'woonplaats', err: 'err-woonplaats' },
-  { id: 'postcode', err: 'err-postcode' },
-  { id: 'adres', err: 'err-adres' },
-  { id: 'startdatum', err: 'err-startdatum' },
-  { id: 'einddatum', err: 'err-einddatum' },
-  { id: 'tekendatum', err: 'err-tekendatum' },
-  { id: 'uurloondatum', err: 'err-uurloondatum' },
-  { id: 'uurloon', err: 'err-uurloon' },
-];
-
-function validate() {
-  let ok = true;
-  REQUIRED.forEach(({ id, err }) => {
-    const el = document.getElementById(id);
-    const errEl = document.getElementById(err);
-    if (!el.value.trim()) {
-      el.classList.add('error');
-      errEl.classList.add('visible');
-      ok = false;
-    } else {
-      el.classList.remove('error');
-      errEl.classList.remove('visible');
-    }
-  });
-  return ok;
+function computeEindPlus1(eindVal) {
+  const { y: ey, m: em, d: ed } = parseDate(eindVal);
+  let p1d = ed + 1, p1m = em, p1y = ey;
+  const days = new Date(p1y, p1m, 0).getDate();
+  if (p1d > days) { p1d = 1; p1m++; }
+  if (p1m > 12) { p1m = 1; p1y++; }
+  return { y: p1y, m: p1m, d: p1d };
 }
 
-// Clear error on input
-REQUIRED.forEach(({ id, err }) => {
-  document.getElementById(id).addEventListener('input', () => {
-    document.getElementById(id).classList.remove('error');
-    document.getElementById(err).classList.remove('visible');
-  });
-});
-
-// ─── Reset ─────────────────────────────────────────────────────────────────
-function resetForm() {
-  document.getElementById('paste-input').value = '';
-  document.getElementById('aanhef').value = 'Mevrouw';
-  REQUIRED.forEach(({ id, err }) => {
-    document.getElementById(id).value = '';
-    document.getElementById(id).classList.remove('error');
-    document.getElementById(err).classList.remove('visible');
-  });
-  badgeEind.style.display = 'none';
-  badgeUurloon.style.display = 'none';
-}
-
-// ─── Generate ──────────────────────────────────────────────────────────────
-async function generateContract() {
-  if (!validate()) {
-    showToast('Vul alle verplichte velden in', true);
-    return;
-  }
-
-  if (typeof JSZip === 'undefined') {
-    showToast('JSZip laadt nog, probeer opnieuw', true);
-    return;
-  }
+async function generatePDF() {
+  if (!validate()) { showToast('Vul alle verplichte velden in', true); return; }
 
   const btn = document.getElementById('btn-generate');
   btn.disabled = true;
-  btn.textContent = 'Genereren…';
+  btn.innerHTML = '⏳ Genereren…';
 
   try {
-    // Compute EINDDATUM_PLUS1 (puur met datumonderdelen, geen timezone-shift)
     const eindVal = document.getElementById('einddatum').value;
-    const [ey, em, ed] = eindVal.split('-').map(Number);
-    let p1d = ed + 1, p1m = em, p1y = ey;
-    const daysInMonth = new Date(p1y, p1m, 0).getDate();
-    if (p1d > daysInMonth) { p1d = 1; p1m += 1; }
-    if (p1m > 12) { p1m = 1; p1y += 1; }
-    const eindPlus1Str = `${p1y}-${String(p1m).padStart(2,'0')}-${String(p1d).padStart(2,'0')}`;
+    const eindPlus1 = computeEindPlus1(eindVal);
 
-    const uurloonVal = parseFloat(document.getElementById('uurloon').value).toFixed(2).replace('.', ',');
+    const uurloonRaw = parseFloat(document.getElementById('uurloon').value || 0);
+    const salarisRaw = parseFloat(document.getElementById('salaris').value || 0);
 
     const data = {
       AANHEF: document.getElementById('aanhef').value,
       NAAM: document.getElementById('naam').value,
-      GEBOORTEDATUM: formatNL(document.getElementById('geboortedatum').value),
+      GEBOORTEDATUM: formatNL(parseDate(document.getElementById('geboortedatum').value)),
       WOONPLAATS: document.getElementById('woonplaats').value,
       POSTCODE: document.getElementById('postcode').value,
       ADRES: document.getElementById('adres').value,
-      STARTDATUM: formatNL(document.getElementById('startdatum').value),
-      EINDDATUM: formatNL(eindVal),
-      EINDDATUM_PLUS1: formatNL(eindPlus1Str),
-      UURLOONDATUM: 'Per ' + formatNL(document.getElementById('uurloondatum').value),
-      UURLOON: '€ ' + uurloonVal,
-      TEKENDATUM: formatNL(document.getElementById('tekendatum').value),
+      FUNCTIE: document.getElementById('functie').value,
+      STARTDATUM: formatNL(parseDate(document.getElementById('startdatum').value)),
+      EINDDATUM: formatNL(parseDate(eindVal)),
+      EINDDATUM_PLUS1: formatNL(eindPlus1),
+      UURLOONDATUM: formatNL(parseDate(document.getElementById('uurloondatum').value)),
+      UURLOON: '€ ' + uurloonRaw.toFixed(2).replace('.', ','),
+      MIN_UREN: document.getElementById('min-uren').value,
+      MAX_UREN: document.getElementById('max-uren').value,
+      SALARISDATUM: formatNL(parseDate(document.getElementById('salarisdatum').value)),
+      SALARIS: '€ ' + salarisRaw.toFixed(2).replace('.', ','),
+      TEKENDATUM: formatNL(parseDate(document.getElementById('tekendatum').value)),
     };
 
-    // Load template from separate file in repository
-    const response = await fetch('template.docx');
-    if (!response.ok) throw new Error('Template niet gevonden');
-    const arrayBuffer = await response.arrayBuffer();
+    const isOproep = contractType === 'oproep';
+    const titel = isOproep ? 'OPROEPOVEREENKOMST VOOR BEPAALDE TIJD' : 'MIN-MAX ARBEIDSOVEREENKOMST VOOR BEPAALDE TIJD';
+    const art4 = isOproep ? ARTIKEL_4_OPROEP : ARTIKEL_4_MINMAX;
+    const art5 = isOproep ? ARTIKEL_5_OPROEP : ARTIKEL_5_MINMAX;
 
-    const zip = await JSZip.loadAsync(arrayBuffer);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
 
-    // Replace in document.xml
-    const docFile = zip.file('word/document.xml');
-    let xml = await docFile.async('string');
+    const marginL = 25, marginR = 25, marginT = 25, marginB = 25;
+    const pageW = 210, pageH = 297;
+    const contentW = pageW - marginL - marginR;
+    let y = marginT;
 
-    for (const [key, value] of Object.entries(data)) {
-      xml = xml.split(`{{${key}}}`).join(escapeXml(value));
+    const FONT = 'helvetica';
+    const LINE_HEIGHT = 5.5;
+    const PARA_GAP = 3;
+    const ART_GAP = 5;
+
+    function checkPage(needed = 10) {
+      if (y + needed > pageH - marginB) {
+        doc.addPage();
+        y = marginT;
+      }
     }
 
-    zip.file('word/document.xml', xml);
+    function writeText(text, opts = {}) {
+      const { bold = false, size = 10, indent = 0, center = false } = opts;
+      doc.setFont(FONT, bold ? 'bold' : 'normal');
+      doc.setFontSize(size);
+      const maxW = contentW - indent;
+      const lines = doc.splitTextToSize(text, maxW);
+      lines.forEach(line => {
+        checkPage(LINE_HEIGHT + 1);
+        if (center) {
+          doc.text(line, pageW / 2, y, { align: 'center' });
+        } else {
+          doc.text(line, marginL + indent, y);
+        }
+        y += LINE_HEIGHT;
+      });
+    }
 
-    // Generate and download
-    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    function writeArtikel(artikel) {
+      checkPage(20);
+      const label = `Artikel ${artikel.nr}`;
+      doc.setFont(FONT, 'bold');
+      doc.setFontSize(10);
+      const labelW = doc.getTextWidth(label) + 8;
+      doc.text(label, marginL, y);
+      doc.setFont(FONT, 'bold');
+      doc.text(artikel.titel, marginL + labelW, y);
+      y += LINE_HEIGHT + 1;
+
+      const filled = fillPlaceholders(artikel.tekst, data);
+      const paragraphs = filled.split('\n\n');
+      paragraphs.forEach((para, i) => {
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(10);
+        const lines = doc.splitTextToSize(para.trim(), contentW);
+        lines.forEach(line => {
+          checkPage(LINE_HEIGHT + 1);
+          doc.text(line, marginL, y);
+          y += LINE_HEIGHT;
+        });
+        if (i < paragraphs.length - 1) y += PARA_GAP;
+      });
+      y += ART_GAP;
+    }
+
+    // ── Titel ──
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(13);
+    doc.text(titel, pageW / 2, y, { align: 'center' });
+    y += 10;
+
+    // ── Ondergetekenden ──
+    writeText('Ondergetekenden:', { bold: true, size: 10 });
+    y += 3;
+
+    INTRO_SHARED.forEach(item => {
+      if (item.type === 'declare') {
+        y += 3;
+        writeText(item.text, { bold: true });
+        y += 5;
+      } else {
+        const filled = fillPlaceholders(item.text, data);
+        writeText(filled, { size: 10 });
+        y += 4;
+      }
+    });
+
+    // ── Artikelen ──
+    writeArtikel(ARTIKEL_1);
+    writeArtikel(ARTIKEL_2);
+    writeArtikel(ARTIKEL_3_SHARED);
+    writeArtikel(art4);
+    writeArtikel(art5);
+    ARTIKELEN_SHARED.forEach(a => writeArtikel(a));
+
+    // ── Ondertekening ──
+    checkPage(50);
+    y += 5;
+    const tekst = fillPlaceholders('Aldus overeengekomen en in tweevoud opgemaakt en getekend te Amsterdam op {{TEKENDATUM}}', data);
+    writeText(tekst, { size: 10 });
+    y += 10;
+
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(10);
+    doc.text('Werkgever:', marginL, y);
+    doc.text('Werknemer:', marginL + 90, y);
+    y += 6;
+
+    doc.setFont(FONT, 'normal');
+    doc.text('Fleur van Asbeck    Sanne Wiesman', marginL, y);
+    doc.text(data.NAAM, marginL + 90, y);
+    y += 15;
+
+    doc.text('………………………………………', marginL, y);
+    doc.text('………………………………………', marginL + 90, y);
+    y += 5;
+
+    doc.setFontSize(9);
+    doc.text('(handtekening)', marginL, y);
+    doc.text('(handtekening)', marginL + 90, y);
+    y += 8;
+
+    doc.setFontSize(9);
+    doc.text('Paraaf werkgever', marginL + 20, y);
+    doc.text('Paraaf werknemer', marginL + 110, y);
+
+    // ── Download ──
     const naam = data.NAAM.replace(/\s+/g, '_');
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Oproepovereenkomst_${naam}.docx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const prefix = isOproep ? 'Oproepovereenkomst' : 'MinMax_overeenkomst';
+    doc.save(`${prefix}_${naam}.pdf`);
+    showToast('PDF gegenereerd!');
 
-    showToast('Contract gegenereerd!');
   } catch (e) {
     console.error(e);
-    showToast('Er ging iets mis bij het genereren', true);
+    showToast('Er ging iets mis: ' + e.message, true);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Contract genereren';
+    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> PDF genereren';
   }
-}
-
-function escapeXml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 </script>
 </body>
