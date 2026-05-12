@@ -297,6 +297,7 @@ input.error { border-color: #e24b4a; box-shadow: 0 0 0 3px rgba(226,75,74,0.1); 
 
   <div class="actions">
     <button class="btn btn-secondary" onclick="resetForm()">Leegmaken</button>
+    <button class="btn btn-secondary" onclick="fillTestData()">Testdata invullen</button>
     <button class="btn btn-primary" id="btn-generate" onclick="generatePDF()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       PDF genereren
@@ -474,6 +475,29 @@ function validate() {
   });
 });
 
+function fillTestData() {
+  document.getElementById('aanhef').value = 'Mevrouw';
+  document.getElementById('naam').value = 'Anna de Vries';
+  document.getElementById('geboortedatum').value = '1995-03-15';
+  document.getElementById('woonplaats').value = 'Amsterdam';
+  document.getElementById('postcode').value = '1018 GV';
+  document.getElementById('adres').value = 'Sarphatistraat 72';
+  document.getElementById('functie').value = 'Personal Assistant';
+  document.getElementById('startdatum').value = '2026-06-01';
+  document.getElementById('tekendatum').value = '2026-05-12';
+
+  // Trigger startdatum change to auto-fill einddatum etc.
+  document.getElementById('startdatum').dispatchEvent(new Event('change'));
+
+  // Salaris velden
+  document.getElementById('uurloon').value = '14.50';
+  document.getElementById('min-uren').value = '8';
+  document.getElementById('max-uren').value = '40';
+  document.getElementById('salaris').value = '2500.00';
+
+  showToast('Testdata ingevuld!');
+}
+
 function resetForm() {
   document.getElementById('paste-input').value = '';
   document.getElementById('aanhef').value = 'Mevrouw';
@@ -566,9 +590,23 @@ async function generatePDF() {
     const PARA_GAP = 3;
     const ART_GAP = 5;
 
+    function drawFooter() {
+      const footerY = pageH - 12;
+      doc.setFont(FONT, 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text('Paraaf werkgever: ………………………', marginL, footerY);
+      doc.text('Paraaf werknemer: ………………………', pageW - marginR, footerY, { align: 'right' });
+      doc.setTextColor(0);
+    }
+
+    // Footer op eerste pagina
+    drawFooter();
+
     function checkPage(needed = 10) {
-      if (y + needed > pageH - marginB) {
+      if (y + needed > pageH - marginB - 10) {
         doc.addPage();
+        drawFooter();
         y = marginT;
       }
     }
@@ -674,9 +712,7 @@ async function generatePDF() {
     doc.text('(handtekening)', marginL + 90, y);
     y += 8;
 
-    doc.setFontSize(9);
-    doc.text('Paraaf werkgever', marginL + 20, y);
-    doc.text('Paraaf werknemer', marginL + 110, y);
+
 
     // ── Download ──
     const naam = data.NAAM.replace(/\s+/g, '_');
