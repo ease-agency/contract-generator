@@ -3323,7 +3323,7 @@ function vulTemplateHtml(html, key, data, vlaggen) {
   // Paginabreedte en marges van het template zelf aanhouden, zodat kop- en voettekst op hun plek staan
   // (de koptekst staat in een document in de bovenmarge, standaard 36pt van de rand)
   // Paginascheidingen (Google zet ze onzichtbaar in de export) tonen als grijze strook
-  stijl.textContent = 'html{background:#efede8}body{margin:16px auto!important;padding-top:36pt!important;box-shadow:0 1px 4px rgba(0,0,0,.15);overflow-x:hidden}'
+  stijl.textContent = 'html{background:#efede8}body{margin:16px auto!important;box-shadow:0 1px 4px rgba(0,0,0,.15);overflow-x:hidden}'
     + 'hr[style*="page-break"]{display:block!important;border:0!important;height:18px!important;margin:36pt -200pt!important;background:#efede8!important}';
   doc.head.appendChild(stijl);
   return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
@@ -3394,25 +3394,150 @@ function renderPreviewPanel() {
     frame = body.querySelector('iframe.preview-frame');
   }
   frame.onload = () => {
+    let d, w;
     try {
-      // Pagina verkleinen als hij breder is dan het voorbeeldvenster
-      const d = frame.contentDocument;
+      d = frame.contentDocument; w = frame.contentWindow;
       d.documentElement.style.zoom = '';
       // Paginakleur van het template aanhouden; alleen wit als het template er geen heeft
-      const achtergrond = frame.contentWindow.getComputedStyle(d.body).backgroundColor;
+      const achtergrond = w.getComputedStyle(d.body).backgroundColor;
       if (!achtergrond || achtergrond === 'transparent' || achtergrond === 'rgba(0, 0, 0, 0)') d.body.style.backgroundColor = '#fff';
       // Template zonder paginabreedte (bijv. "zonder pagina's")? Dan A4 met normale marges.
-      if (frame.contentWindow.getComputedStyle(d.body).maxWidth === 'none') {
+      if (w.getComputedStyle(d.body).maxWidth === 'none') {
         d.body.style.setProperty('max-width', '451.4pt', 'important');
-        d.body.style.setProperty('padding', '36pt 72pt 72pt 72pt', 'important');
+        d.body.style.setProperty('padding', '72pt 72pt 72pt 72pt', 'important');
       }
-      const breed = d.body.getBoundingClientRect().width + 32;
-      const schaal = frame.clientWidth ? Math.min(1, frame.clientWidth / breed) : 1;
-      if (schaal < 1) d.documentElement.style.zoom = String(schaal);
-      frame.contentWindow.scrollTo(0, scroll);
-    } catch (e) {}
+    } catch (e) { return; }
+    const afronden = () => {
+      try { pagineerVoorbeeld(d, w); } catch (e) { console.warn('Pagina-indeling voorbeeld mislukt', e); }
+      try {
+        // Pagina verkleinen als hij breder is dan het voorbeeldvenster
+        const pagina = d.querySelector('.ct-pagina') || d.body;
+        const breed = pagina.getBoundingClientRect().width + 32;
+        const schaal = frame.clientWidth ? Math.min(1, frame.clientWidth / breed) : 1;
+        if (schaal < 1) d.documentElement.style.zoom = String(schaal);
+        w.scrollTo(0, scroll);
+      } catch (e) {}
+    };
+    // Eerst de lettertypes laden, anders klopt de indeling niet
+    const klaar = d.fonts && d.fonts.ready ? d.fonts.ready : Promise.resolve();
+    let gedaan = false;
+    const eenmaal = () => { if (!gedaan) { gedaan = true; afronden(); } };
+    klaar.then(eenmaal, eenmaal);
+    setTimeout(eenmaal, 2000);
   };
   frame.srcdoc = html;
+}
+
+// Verdeelt het voorbeeld over A4-pagina's: koptekst en voettekst op elke pagina,
+// alinea's niet gesplitst, titels bij de volgende tekst, paginascheidingen aangehouden.
+function pagineerVoorbeeld(d, w) {
+  const body = d.body;
+  const cs = w.getComputedStyle(body);
+  const px = v => parseFloat(v) || 0;
+  const PT = 96 / 72;
+  const breedte = body.getBoundingClientRect().width;
+  const hoogte = Math.round(breedte * 297 / 210);
+  const padL = px(cs.paddingLeft), padR = px(cs.paddingRight), padT = px(cs.paddingTop), padB = px(cs.paddingBottom);
+  const achtergrond = cs.backgroundColor;
+  const kinderen = [...body.children].filter(el => !/^(SCRIPT|STYLE|LINK|META)$/.test(el.tagName));
+  if (kinderen.length < 2) return;
+  let kop = null, voet = null;
+  if (kinderen[0].tagName === 'DIV') kop = kinderen.shift();
+  if (kinderen.length > 1 && kinderen[kinderen.length - 1].tagName === 'DIV') voet = kinderen.pop();
+
+  const paginas = d.createElement('div');
+  body.appendChild(paginas);
+  ['padding', 'max-width', 'box-shadow', 'margin'].forEach(k => body.style.setProperty(k, k === 'max-width' ? 'none' : '0', 'important'));
+  body.style.setProperty('background', 'transparent', 'important');
+  body.style.setProperty('overflow-x', 'visible', 'important');
+
+  const nieuwePagina = () => {
+    const pg = d.createElement('div');
+    pg.className = 'ct-pagina';
+    pg.style.cssText = `position:relative;box-sizing:border-box;width:${breedte}px;height:${hoogte}px;margin:16px auto;background:${achtergrond};box-shadow:0 1px 4px rgba(0,0,0,.15);overflow:hidden;`;
+    paginas.appendChild(pg);
+    let boven = Math.max(padT, 36 * PT), onder = Math.max(padB, 36 * PT);
+    if (kop) {
+      const k = kop.cloneNode(true);
+      k.style.cssText += `;position:absolute;top:${36 * PT}px;left:${padL}px;right:${padR}px;`;
+      pg.appendChild(k);
+      boven = Math.max(padT, 36 * PT + k.getBoundingClientRect().height + 6);
+    }
+    if (voet) {
+      const v = voet.cloneNode(true);
+      v.style.cssText += `;position:absolute;bottom:${36 * PT}px;left:${padL}px;right:${padR}px;`;
+      pg.appendChild(v);
+      onder = Math.max(padB, 36 * PT + v.getBoundingClientRect().height + 6);
+    }
+    const inhoud = d.createElement('div');
+    inhoud.className = 'ct-inhoud';
+    inhoud.style.cssText = `position:absolute;top:${boven}px;left:${padL}px;right:${padR}px;height:${Math.max(100, hoogte - boven - onder)}px;`;
+    pg.appendChild(inhoud);
+    return inhoud;
+  };
+
+  const leeg = el => el.tagName === 'P' && !el.textContent.replace(/ /g, ' ').trim() && !el.querySelector('img');
+  const isKop = el => {
+    if (/^H[1-6]$/.test(el.tagName)) return true;
+    if (el.tagName !== 'P') return false;
+    const t = el.textContent.replace(/ /g, ' ').trim();
+    if (!t || t.length > 100 || /[.;,]$/.test(t)) return false;
+    if (/:$/.test(t)) return true;
+    const spans = [...el.querySelectorAll('span')].filter(s => s.textContent.trim());
+    return spans.length > 0 && spans.every(s => parseInt(w.getComputedStyle(s).fontWeight, 10) >= 600);
+  };
+
+  let inhoud = nieuwePagina();
+  const past = () => inhoud.scrollHeight <= inhoud.clientHeight + 1;
+  const volgende = () => {
+    // Titels (en lege regels erachter) onderaan de pagina gaan mee naar de volgende
+    const staart = [];
+    let el = inhoud.lastElementChild;
+    while (el && (leeg(el) || isKop(el))) { staart.unshift(el); el = el.previousElementSibling; }
+    const vanaf = staart.findIndex(isKop);
+    const mee = vanaf >= 0 && staart.length < inhoud.childElementCount ? staart.slice(vanaf) : [];
+    mee.forEach(m => m.remove());
+    inhoud = nieuwePagina();
+    mee.forEach(m => inhoud.appendChild(m));
+  };
+
+  for (const el of kinderen) {
+    if (el.tagName === 'HR' && /page-break/i.test(el.getAttribute('style') || '')) {
+      el.remove();
+      if (inhoud.childElementCount) inhoud = nieuwePagina();
+      continue;
+    }
+    inhoud.appendChild(el);
+    if (past() || inhoud.childElementCount === 1) continue;
+    el.remove();
+    // Lange opsommingen per punt verdelen
+    if ((el.tagName === 'UL' || el.tagName === 'OL') && el.children.length > 1) {
+      const items = [...el.children];
+      let start = parseInt(el.getAttribute('start') || '1', 10) || 1;
+      let lijst = el.cloneNode(false);
+      inhoud.appendChild(lijst);
+      items.forEach(li => {
+        lijst.appendChild(li);
+        if (!past() && lijst.children.length > 1) {
+          li.remove();
+          start += lijst.children.length;
+          volgende();
+          lijst = el.cloneNode(false);
+          if (el.tagName === 'OL') lijst.setAttribute('start', start);
+          inhoud.appendChild(lijst);
+          lijst.appendChild(li);
+        } else if (!past()) {
+          lijst.remove(); volgende(); inhoud.appendChild(lijst);
+        }
+      });
+      continue;
+    }
+    volgende();
+    inhoud.appendChild(el);
+  }
+  if (kop) kop.remove();
+  if (voet) voet.remove();
+  [...body.querySelectorAll(':scope > hr')].forEach(h => h.remove());
 }
 
 function scheduleLivePreview() {
