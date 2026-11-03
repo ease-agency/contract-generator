@@ -815,7 +815,7 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
           <span class="err-msg" id="err-ad-ingangsdatum-ovk">Vul een datum in</span>
         </div>
       </div>
-      <div class="card-title" style="margin-top:8px;">Scenario (minimaal één verplicht)</div>
+      <div id="ad-scenario"><div class="card-title" style="margin-top:8px;">Scenario (minimaal één verplicht)</div>
       <div style="display:flex;gap:24px;margin-bottom:14px;flex-wrap:wrap;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
           <input type="checkbox" id="ad-toggle-uurloon" onchange="adUpdateToggles()"> Uurloon aanpassen / vastleggen
@@ -824,7 +824,7 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
           <input type="checkbox" id="ad-toggle-verleng" onchange="adUpdateToggles()"> Contract verlengen
         </label>
       </div>
-      <span class="err-msg" id="err-ad-toggle" style="margin-bottom:10px;">Selecteer minimaal één scenario</span>
+      <span class="err-msg" id="err-ad-toggle" style="margin-bottom:10px;">Selecteer minimaal één scenario</span></div>
       <div id="ad-section-uurloon" style="display:none;">
         <div class="card-title" style="margin-top:0;">Uurloon wijziging</div>
         <div style="display:flex;gap:24px;margin-bottom:12px;flex-wrap:wrap;">
@@ -3508,7 +3508,7 @@ function vulTemplateHtml(html, key, data, vlaggen) {
   // Variabelen invullen
   const bekend = new Set(contractVariabelen(key));
   doc.body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li').forEach(el => {
-    vervangInElement(el, /\{\{\s*([^{}]+?)\s*\}\}/g, m => { const v = variabeleVoor(m[1], bekend); return v ? '\uE001' + (String(data[v] ?? '').trim() || '…………') + '\uE002' : m[0]; });
+    vervangInElement(el, /(€\s?)?\{\{\s*([^{}]+?)\s*\}\}/g, m => { const v = variabeleVoor(m[2], bekend); if (!v) return m[0]; const w = String(data[v] ?? '').trim(); return (m[1] && /^€/.test(w) ? '' : (m[1] || '')) + '\uE001' + (w || '…………') + '\uE002'; });
   });
 
   markeerIngevuld(doc);
@@ -3543,7 +3543,8 @@ function previewLettertypes(doc) {
   [...laden].slice(0, 12).forEach(f => {
     const link = doc.createElement('link');
     link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':ital,wght@0,400;0,700;1,400;1,700&display=swap';
+    const dik = ({ 'lato': [100, 300, 400, 700, 900], 'playfair display': [400, 500, 600, 700, 800, 900], 'montserrat': [100, 200, 300, 400, 500, 600, 700, 800, 900], 'gelasio': [400, 500, 600, 700] })[f.toLowerCase()] || [400, 700];
+    link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':ital,wght@' + [0, 1].map(i => dik.map(w => i + ',' + w).join(';')).join(';') + '&display=swap';
     doc.head.appendChild(link);
   });
 }
@@ -3568,6 +3569,9 @@ function markeerIngevuld(doc) {
 }
 // Na het laden: ingevulde waarden de kleur van de gewone tekst in de alinea geven
 function kleurIngevuld(d, w) {
+  const docTel = new Map();
+  tekstNodes(d.body).forEach(n => { if (!n.parentElement || n.parentElement.closest('[data-ingevuld]')) return; const l = (n.data.match(/[A-Za-z0-9À-ÿ]/g) || []).length; if (!l) return; const kl = w.getComputedStyle(n.parentElement).color; docTel.set(kl, (docTel.get(kl) || 0) + l); });
+  const docBasis = docTel.size ? [...docTel.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
   d.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6').forEach(alinea => {
     const ingevuld = [...alinea.querySelectorAll('[data-ingevuld]')];
     if (!ingevuld.length) return;
@@ -3579,7 +3583,7 @@ function kleurIngevuld(d, w) {
       const kl = w.getComputedStyle(n.parentElement).color;
       telling.set(kl, (telling.get(kl) || 0) + letters);
     });
-    if (!telling.size) return;
+    if (!telling.size) { if (!docBasis) return; telling.set(docBasis, 1); }
     const basis = [...telling.entries()].sort((a, b) => b[1] - a[1])[0][0];
     ingevuld.forEach(sp => {
       sp.style.color = basis;
@@ -3654,16 +3658,24 @@ function renderPreviewPanel() {
         const pagina = d.querySelector('.ct-pagina') || d.body;
         const breed = pagina.getBoundingClientRect().width + 32;
         const schaal = frame.clientWidth ? Math.min(1, frame.clientWidth / breed) : 1;
-        if (schaal < 1) d.documentElement.style.zoom = String(schaal);
+        if (schaal < 1) {
+          const b = d.body;
+          const hoog = b.getBoundingClientRect().height;
+          b.style.setProperty('width', breed + 'px', 'important');
+          b.style.transformOrigin = '0 0';
+          b.style.transform = 'scale(' + schaal + ')';
+          b.style.setProperty('margin', '0 0 ' + (-(1 - schaal) * hoog) + 'px ' + Math.max(0, (frame.clientWidth - breed * schaal) / 2) + 'px', 'important');
+          d.documentElement.style.overflowX = 'hidden';
+        }
         w.scrollTo(0, scroll);
       } catch (e) {}
     };
     // Eerst de lettertypes laden, anders klopt de indeling niet
-    const klaar = d.fonts && d.fonts.ready ? d.fonts.ready : Promise.resolve();
+    const klaar = d.fonts ? Promise.all([...d.fonts].map(f => f.load().catch(() => {}))).then(() => d.fonts.ready) : Promise.resolve();
     let gedaan = false;
     const eenmaal = () => { if (!gedaan) { gedaan = true; afronden(); } };
     klaar.then(eenmaal, eenmaal);
-    setTimeout(eenmaal, 2000);
+    setTimeout(eenmaal, 5000);
   };
   frame.srcdoc = html;
 }
@@ -3883,6 +3895,11 @@ async function vulDocument(id, key, data, vlaggen) {
     if (last && rg[0] <= last[1]) last[1] = Math.max(last[1], rg[1]); else samen.push([...rg]);
   });
   const requests = samen.reverse().map(([s, e]) => ({ deleteContentRange: { range: { startIndex: s, endIndex: e } } }));
+  { const bekendE = new Set(contractVariabelen(key)), gezienE = new Set();
+    alineas.forEach(a => { for (const m of a.tekst.matchAll(/€\s?\{\{\s*([^{}]+?)\s*\}\}/g)) {
+      const v = variabeleVoor(m[1], bekendE), w = String(data[v] ?? '');
+      if (v && /^€/.test(w.trim()) && !gezienE.has(m[0])) { gezienE.add(m[0]); requests.push({ replaceAllText: { containsText: { text: m[0], matchCase: false }, replaceText: w } }); }
+    } }); }
   const vars = contractVariabelen(key);
   vars.forEach(v => {
     requests.push({ replaceAllText: { containsText: { text: '{{' + v + '}}', matchCase: true }, replaceText: String(data[v] ?? '') } });
@@ -3949,6 +3966,10 @@ async function controleerVoorPDF(id) {
 const kleurSleutel = k => k ? JSON.stringify(k) : '';
 function kleurVerzoeken(alineas, bekend) {
   const reqs = [];
+  const docTel = new Map();
+  alineas.forEach(a => { const binnen = new Array(a.tekst.length).fill(false); for (const m of a.tekst.matchAll(/\{\{[^{}]*\}\}/g)) for (let k = m.index; k < m.index + m[0].length; k++) binnen[k] = true;
+    for (let k = 0; k < a.tekst.length; k++) { if (binnen[k] || !/[A-Za-z0-9À-ÿ]/.test(a.tekst[k])) continue; const sl = kleurSleutel(a.kleur[k]); docTel.set(sl, (docTel.get(sl) || 0) + 1); } });
+  const docBasisSl = docTel.size ? [...docTel.entries()].sort((x, y) => y[1] - x[1])[0][0] : undefined;
   alineas.forEach(a => {
     const plekken = [...a.tekst.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(m => ({ van: m.index, tot: m.index + m[0].length, bekend: !!variabeleVoor(m[1], bekend) }));
     if (!plekken.some(p => p.bekend)) return;
@@ -3961,7 +3982,7 @@ function kleurVerzoeken(alineas, bekend) {
       const sl = kleurSleutel(a.kleur[k]);
       telling.set(sl, (telling.get(sl) || 0) + 1);
     }
-    if (!telling.size) return;
+    if (!telling.size) { if (docBasisSl === undefined) return; telling.set(docBasisSl, 1); }
     const basisSl = [...telling.entries()].sort((x, y) => y[1] - x[1])[0][0];
     const basis = basisSl ? JSON.parse(basisSl) : null;
     // Bekende plekken + leestekens/spaties tussen twee bekende plekken
@@ -4178,7 +4199,9 @@ function templateInfo(key) {
     const v = variabeleVoor(m[1], bekend);
     if (v) gebruikt.add(v); else onbekend.add(m[1]);
   }
-  return (_templateInfo[key] = { html, gebruikt, onbekend: [...onbekend] });
+  const vlaggen = new Set();
+  for (const m of alles.matchAll(/\[\s*ALS\s+([^\]]+?)\s*\]/gi)) voorwaardeNamen(m[1]).forEach(v => vlaggen.add(v));
+  return (_templateInfo[key] = { html, gebruikt, onbekend: [...onbekend], vlaggen });
 }
 
 function veldGebruikt(id) {
@@ -4201,6 +4224,21 @@ function pasVeldenAan() {
   const key = driveCurrentKey();
   const besluit = document.getElementById('card-algemeen');
   if (besluit) besluit.classList.toggle('hidden', !veldGebruikt('besluitdatum'));
+  // [ALS ...]-keuzes alleen tonen als het template ze gebruikt
+  const vl = key && templateInfo(key) ? templateInfo(key).vlaggen : null;
+  if (key && key.startsWith('pa-addendum')) {
+    const geen = vl && !['UURLOON', 'VERLENGING', 'VERLENG'].some(f => vl.has(f));
+    const sc = document.getElementById('ad-scenario');
+    if (sc) sc.hidden = !!geen;
+    if (geen) {
+      const u = document.getElementById('ad-toggle-uurloon'), v = document.getElementById('ad-toggle-verleng');
+      if (u && v && !(u.checked && v.checked)) { u.checked = true; v.checked = true; adUpdateToggles(); }
+    }
+  }
+  if (key && key.startsWith('pa-afsluit')) {
+    const fd = document.getElementById('field-af-doorstart');
+    if (fd) fd.hidden = !(key === 'pa-afsluit' && (!vl || vl.has('DOORSTART') || vl.has('OVERNAME')));
+  }
   const uren = document.getElementById('ad-section-uren');
   if (uren) uren.classList.toggle('veld-weg', !veldGebruikt('ad-min-uren') && !veldGebruikt('ad-max-uren'));
   if (document.getElementById('view-generator')?.offsetParent === null) return;
@@ -4419,7 +4457,8 @@ function kiesDocument(key) {
     document.getElementById('af-type').value = key === 'pa-afsluit' ? 'klant' : 'volledig';
     if (key !== 'pa-afsluit') zet('af-toggle-doorstart', key === 'pa-afsluit-volledig-overname');
     else if (UI._afVorige !== 'pa-afsluit') zet('af-toggle-doorstart', false);
-    document.getElementById('field-af-doorstart').hidden = key !== 'pa-afsluit';
+    // Het vinkje alleen tonen als het template er iets mee doet ([ALS DOORSTART] … [EINDE])
+    document.getElementById('field-af-doorstart').hidden = !(key === 'pa-afsluit' && /\[\s*ALS\s+[^\]]*(DOORSTART|OVERNAME)/i.test(htmlNaarTekst(driveHtml[key] || '').join('\n')));
     afSyncFormVisibility();
   } else {
     selectContract(key);
