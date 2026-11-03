@@ -3682,6 +3682,8 @@ function pagineerVoorbeeld(d, w) {
   const hoogte = Math.round(breedte * 297 / 210);
   const padL = px(cs.paddingLeft), padR = px(cs.paddingRight), padT = px(cs.paddingTop), padB = px(cs.paddingBottom);
   const achtergrond = cs.backgroundColor;
+  d.querySelectorAll('a[id^="cmnt"]').forEach(a => { const dv = a.closest('div'); if (dv && dv.parentElement === body) dv.remove(); });
+  d.querySelectorAll('a[href^="#cmnt"]').forEach(a => (a.closest('sup') || a).remove());
   const kinderen = [...body.children].filter(el => !/^(SCRIPT|STYLE|LINK|META)$/.test(el.tagName));
   if (kinderen.length < 2) return;
   let kop = null, voet = null;
@@ -3750,6 +3752,7 @@ function pagineerVoorbeeld(d, w) {
       if (inhoud.childElementCount) inhoud = nieuwePagina();
       continue;
     }
+    if (leeg(el) && !inhoud.childElementCount && paginas.children.length > 1) { el.remove(); continue; }
     inhoud.appendChild(el);
     if (past() || inhoud.childElementCount === 1) continue;
     el.remove();
@@ -3776,6 +3779,7 @@ function pagineerVoorbeeld(d, w) {
       continue;
     }
     volgende();
+    if (leeg(el) && !inhoud.childElementCount) { el.remove(); continue; }
     inhoud.appendChild(el);
   }
   if (kop) kop.remove();
