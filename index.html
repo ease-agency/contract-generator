@@ -28,6 +28,7 @@ header p { font-size: 12px; color: #888; margin-top: 2px; }
 .preview-frame { display: block; width: 100%; height: calc(100vh - 230px); min-height: 520px; border: 0; background: #fff; }
 #contract-resultaat { margin: 12px 16px 0; padding: 10px 14px; background: #eaf7f0; border: 1px solid #b9e2cb; border-radius: 10px; font-size: 13px; color: #1a4d33; line-height: 1.6; }
 #contract-resultaat a { color: var(--purple); font-weight: 700; }
+#contract-resultaat.let-op { background: #fdecea; border-color: #f3b8b2; color: #7a1c14; }
 .drive-notice { background: #fffaf0; border: 1px solid #f0d9a0; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; color: #6b5310; margin-bottom: 1rem; }
 @media (max-width: 640px) { header { flex-wrap: wrap; } .tekst-bron { margin-left: 0; } }
 
@@ -650,6 +651,19 @@ input.auto-filled:focus, select.auto-filled:focus { border-color: var(--purple);
             <label for="ad-uurloon-nieuw">Nieuw bruto uurloon</label>
             <div class="euro-wrap"><input type="number" id="ad-uurloon-nieuw" placeholder="0.00" min="0" step="0.01"></div>
             <span class="err-msg" id="err-ad-uurloon-nieuw">Vul het nieuwe uurloon in</span>
+          </div>
+        </div>
+      </div>
+      <div id="ad-section-uren" style="display:none;margin-bottom:12px;">
+        <div class="card-title" style="margin-top:0;">Uren (min-max)</div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="ad-min-uren">Minimum aantal uur per week</label>
+            <input type="number" id="ad-min-uren" min="0" step="1" placeholder="bijv. 8">
+          </div>
+          <div class="field">
+            <label for="ad-max-uren">Maximum aantal uur per week</label>
+            <input type="number" id="ad-max-uren" min="0" step="1" placeholder="bijv. 32">
           </div>
         </div>
       </div>
@@ -1687,19 +1701,38 @@ const VARIABELEN = {
   dienstverband: ['AANHEF', 'NAAM', 'GEBOORTEDATUM', 'ADRES', 'POSTCODE', 'WOONPLAATS', 'FUNCTIE', 'STARTDATUM', 'EINDDATUM', 'EINDDATUM_PLUS1', 'DUUR_MAANDEN', 'UURLOONDATUM', 'UURLOON', 'MIN_UREN', 'MAX_UREN', 'SALARISDATUM', 'SALARIS'],
   freelance:     ['NAAM_PA', 'ADRES_PA', 'POSTCODE_PA', 'STAD_PA', 'STARTDATUM', 'EINDDATUM'],
   afsluit:       ['NAAM_PA', 'KLANTNAAM', 'DATUM_OVEREENKOMST', 'EINDDATUM'],
-  addendum:      ['NAAM_PA', 'DATUM_OVK', 'INGANGSDATUM_OVK', 'OVK_TERM', 'DATUM_WIJZIGING', 'PERCENTAGE', 'UURLOON_OUD', 'UURLOON_NIEUW', 'VERLENG_START', 'VERLENG_EIND', 'VERLENG_MAANDEN'],
+  addendum:      ['NAAM_PA', 'DATUM_OVK', 'INGANGSDATUM_OVK', 'OVK_TERM', 'DATUM_WIJZIGING', 'PERCENTAGE', 'UURLOON_OUD', 'UURLOON_NIEUW', 'UURLOON_KOP', 'VERLENG_START', 'VERLENG_EIND', 'VERLENG_MAANDEN', 'MIN_UREN', 'MAX_UREN'],
   klant:         ['BEDRIJFSNAAM', 'CONTACTPERSOON', 'KVK', 'ADRES', 'POSTCODE', 'WOONPLAATS', 'FUNCTIE', 'STARTDATUM', 'EINDDATUM', 'DUUR_MAANDEN', 'TARIFDATUM', 'AV_VERSIE'],
 };
 // Andere schrijfwijzen in de templates die hetzelfde betekenen
+// (Hoofdletters en spaties maken niet uit: {{datum overeenkomst}} = {{DATUM_OVEREENKOMST}},
+// en in PA-documenten betekent {{NAAM}} de naam van de PA.)
 const ALIASSEN = {
   'maand jaar': 'AV_VERSIE',
+  'month year': 'AV_VERSIE',
   'personal assistant/office manager/project manager': 'FUNCTIE',
+  'aantal maanden': 'DUUR_MAANDEN',
+  'ingangsdatum arbeidsovereenkomst': 'INGANGSDATUM_OVK',
+  'ingangsdatum oproepovereenkomst': 'INGANGSDATUM_OVK',
+  'ondertekeningsdatum arbeidsovereenkomst': 'DATUM_OVK',
+  'ondertekeningsdatum oproepovereenkomst': 'DATUM_OVK',
+  'oud': 'UURLOON_OUD',
+  'nieuw': 'UURLOON_NIEUW',
+  'minimum aantal uur': 'MIN_UREN',
+  'mimimum aantal uur': 'MIN_UREN',
+  'maximum aantal uur': 'MAX_UREN',
+  'aanpassing uurloon of vastlegging uurloonaanpassing': 'UURLOON_KOP',
 };
-const aliasNorm = t => (t || '').toLowerCase().replace(/\s*\/\s*/g, '/').replace(/\s+/g, ' ').trim();
+// Opmerking-markeringen zoals [a] uit een geëxporteerd document negeren
+const aliasNorm = t => (t || '').replace(/\[[a-z]{1,2}\]/g, '').toLowerCase().replace(/\s*\/\s*/g, '/').replace(/\s+/g, ' ').trim();
 // Naam tussen {{ }} → variabele (of null als onbekend)
 function variabeleVoor(naam, bekend) {
   const n = (naam || '').trim();
   if (bekend.has(n)) return n;
+  const up = n.replace(/\[[a-z]{1,2}\]/g, '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if (bekend.has(up)) return up;
+  if (bekend.has(up + '_PA')) return up + '_PA';
+  if (up === 'WOONPLAATS' && bekend.has('STAD_PA')) return 'STAD_PA';
   const a = ALIASSEN[aliasNorm(n)];
   return a && bekend.has(a) ? a : null;
 }
@@ -1734,6 +1767,7 @@ let driveProblems = {};          // key → waarom een template niet bruikbaar i
 let driveDocIds = {};            // key → Google Doc id van het template
 let driveDocNamen = {};          // key → naam van het template in Drive
 let driveDocMeta = {};           // key → { naam, gewijzigd, door } van het document zelf
+let driveLettertypes = {};       // key → [{ font, pct }]
 let driveState = { status: 'none', loadedAt: null, missing: [], message: '' };
 let laatsteContract = null;      // { id, naam, url } van het laatst gemaakte contract
 
@@ -1818,7 +1852,10 @@ function contractData() {
   const n = new Date();
   d.VANDAAG = formatNL({ y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() });
   if (!d.TEKENDATUM) d.TEKENDATUM = '………………………';
-  if (contractType === 'addendum') d.OVK_TERM = adGetOvkTerm();
+  if (contractType === 'addendum') {
+    d.OVK_TERM = adGetOvkTerm();
+    d.UURLOON_KOP = document.getElementById('ad-type-vastlegging')?.checked ? 'Vastlegging uurloonaanpassing' : 'Aanpassing uurloon';
+  }
   return d;
 }
 function contractVariabelen(key) {
@@ -1910,6 +1947,43 @@ function htmlNaarTekst(html) {
   return [...doc.body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, td')].map(el => el.textContent.replace(/ /g, ' ').trim());
 }
 
+// Welke lettertypes staan er echt in een template (aandeel van de tekst)
+function templateLettertypes(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const perKlasse = {};
+  let standaard = '';
+  doc.querySelectorAll('style').forEach(st => {
+    for (const m of st.textContent.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const f = m[2].match(/font-family\s*:\s*["']?([^"';,}]+)/i);
+      if (!f) continue;
+      m[1].split(';').pop().split(',').forEach(sel => {
+        const k = sel.trim().match(/^\.([\w-]+)$/);
+        if (k) perKlasse[k[1]] = f[1].trim();
+        else if (/^(body|p|li|span)$/i.test(sel.trim()) && !standaard) standaard = f[1].trim();
+      });
+    }
+  });
+  const telling = {};
+  let totaal = 0;
+  const w = doc.createTreeWalker(doc.body, 4 /* SHOW_TEXT */);
+  let n;
+  while ((n = w.nextNode())) {
+    const len = n.data.replace(/\s+/g, '').length;
+    if (!len) continue;
+    let font = '';
+    for (let el = n.parentElement; el && !font; el = el.parentElement) {
+      const inline = (el.getAttribute('style') || '').match(/font-family\s*:\s*["']?([^"';,]+)/i);
+      if (inline) font = inline[1].trim();
+      else for (const c of el.classList) if (perKlasse[c]) { font = perKlasse[c]; break; }
+      if (el === doc.body) break;
+    }
+    font = font || standaard || '(standaard)';
+    telling[font] = (telling[font] || 0) + len;
+    totaal += len;
+  }
+  return Object.entries(telling).sort((a, b) => b[1] - a[1]).map(([font, aantal]) => ({ font, pct: Math.round(100 * aantal / totaal) }));
+}
+
 function driveControleer(key, naam, html) {
   const cfg = DOCS[key];
   const meldingen = [];
@@ -1986,7 +2060,7 @@ async function _driveSyncTexts(silent = false) {
       if (byKey.has(key)) dubbel.push(f.name); else byKey.set(key, f);
     });
 
-    const html = {}, ids = {}, namen = {}, problems = {}, metas = {};
+    const html = {}, ids = {}, namen = {}, problems = {}, metas = {}, lettertypes = {};
     const missing = [];
     const warnings = dubbel.map(n => `"${n}" genegeerd: er is al een document voor hetzelfde contract`);
     for (const key of DRIVE_MANAGED) {
@@ -2015,6 +2089,7 @@ async function _driveSyncTexts(silent = false) {
         problems[key] = `"${file.name}" kon niet worden geopend (${err.message}).`; delete ids[key]; continue;
       }
       warnings.push(...driveControleer(key, file.name, html[key]));
+      try { lettertypes[key] = templateLettertypes(html[key]); } catch (e) {}
     }
 
     driveHtml = html;
@@ -2022,6 +2097,7 @@ async function _driveSyncTexts(silent = false) {
     driveDocIds = ids;
     driveDocNamen = namen;
     driveDocMeta = metas;
+    driveLettertypes = lettertypes;
     driveProblems = problems;
 
     driveState = { status: 'drive', loadedAt: new Date(), missing, message: '', warnings };
@@ -2091,7 +2167,8 @@ function renderTekstenOverzicht() {
     const wanneer = m && m.gewijzigd ? new Date(m.gewijzigd).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
     const naam = driveDocNamen[key] ? `<div style="font-size:11px;color:#888;line-height:1.5;">In de map: ${escHtml(driveDocNamen[key])}` +
       (m && m.naam && m.naam !== driveDocNamen[key] ? `<br>Leest document: ${escHtml(m.naam)}` : '') +
-      (wanneer ? `<br>Laatst gewijzigd: ${escHtml(wanneer)}${m.door ? ' door ' + escHtml(m.door) : ''}` : '') + `</div>` : '';
+      (wanneer ? `<br>Laatst gewijzigd: ${escHtml(wanneer)}${m.door ? ' door ' + escHtml(m.door) : ''}` : '') +
+      ((driveLettertypes[key] || []).length ? `<br>Lettertypes: ${driveLettertypes[key].filter(l => l.pct > 0 || driveLettertypes[key].length === 1).slice(0, 4).map(l => escHtml(l.font) + ' ' + l.pct + '%').join(' · ')}` : '') + `</div>` : '';
     const open = driveDocIds[key] ? `<a href="https://docs.google.com/document/d/${driveDocIds[key]}/edit" target="_blank" rel="noopener" style="color:var(--purple);font-weight:700;white-space:nowrap;">Openen ↗</a>` : '';
     return `<tr><td style="padding:8px 10px 8px 0;vertical-align:top;"><b>${escHtml(c.label)}</b>${naam}</td><td style="padding:8px 10px;vertical-align:top;font-size:12.5px;">${status}</td><td style="padding:8px 0;vertical-align:top;text-align:right;">${open}</td></tr>`;
   };
@@ -2740,6 +2817,8 @@ function fillFromPA(pa) {
   setF('ad-naam-pa', fullName);
   if (pa.startdatum) setF('ad-ingangsdatum-ovk', pa.startdatum);
   if (pa.uurloon) setF('ad-uurloon-oud', pa.uurloon);
+  if (pa.minUren) setF('ad-min-uren', pa.minUren);
+  if (pa.maxUren) setF('ad-max-uren', pa.maxUren);
   if (pa.contracttype === 'pa-minmax' || pa.contracttype === 'pa-oproep') {
     const radio = document.getElementById(pa.contracttype === 'pa-minmax' ? 'ad-ovk-arbeids' : 'ad-ovk-oproep');
     if (radio) { radio.checked = true; if (typeof adUpdateOvkLabel === 'function') adUpdateOvkLabel(); }
@@ -3057,6 +3136,8 @@ function getCurrentData() {
       UURLOON_OUD:      fmtE(document.getElementById('ad-uurloon-oud')?.value || ''),
       UURLOON_NIEUW:    fmtE(document.getElementById('ad-uurloon-nieuw')?.value || ''),
       VERLENG_MAANDEN:  document.getElementById('ad-verleng-maanden')?.value || '…',
+      MIN_UREN:         document.getElementById('ad-min-uren')?.value || '…',
+      MAX_UREN:         document.getElementById('ad-max-uren')?.value || '…',
       ...(() => {
         const { startStr, eindStr } = adCalcVerlengDates(
           document.getElementById('ad-ingangsdatum-ovk')?.value || '',
@@ -3094,6 +3175,8 @@ function adGetOvkTerm() {
 }
 
 function adUpdateOvkLabel() {
+  const urenSectie = document.getElementById('ad-section-uren');
+  if (urenSectie) urenSectie.style.display = document.getElementById('ad-ovk-arbeids')?.checked ? '' : 'none';
   const term = adGetOvkTerm();
   const lbl = document.getElementById('label-ad-datum-ovk');
   if (lbl) lbl.textContent = `Ondertekeningsdatum ${term}`;
@@ -3197,6 +3280,7 @@ function vulTemplateHtml(html, key, data, vlaggen) {
     vervangInElement(el, /\{\{\s*([^{}]+?)\s*\}\}/g, m => { const v = variabeleVoor(m[1], bekend); return v ? (String(data[v] ?? '').trim() || '…………') : m[0]; });
   });
 
+  markeerOnbekend(doc);
   previewLettertypes(doc);
   const stijl = doc.createElement('style');
   stijl.textContent = 'html{background:#fff}body{max-width:none!important;margin:0!important;padding:28px 36px!important;background:#fff!important}';
@@ -3225,6 +3309,27 @@ function previewLettertypes(doc) {
     link.rel = 'stylesheet';
     link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':ital,wght@0,400;0,700;1,400;1,700&display=swap';
     doc.head.appendChild(link);
+  });
+}
+
+// Wat de tool niet kan invullen ({{...}} die overblijven) rood maken
+function markeerOnbekend(doc) {
+  const nodes = tekstNodes(doc.body).filter(n => /\{\{[^{}]+?\}\}/.test(n.data));
+  nodes.forEach(n => {
+    const frag = doc.createDocumentFragment();
+    let rest = n.data, m;
+    const re = /\{\{[^{}]+?\}\}/;
+    while ((m = rest.match(re))) {
+      if (m.index) frag.appendChild(doc.createTextNode(rest.slice(0, m.index)));
+      const span = doc.createElement('span');
+      span.textContent = m[0];
+      span.setAttribute('style', 'color:#d93025!important;background:#fde8e6;font-weight:700;border-radius:2px');
+      span.title = 'Dit kan de tool niet invullen — vul het in Google Docs in (Eerst aanpassen)';
+      frag.appendChild(span);
+      rest = rest.slice(m.index + m[0].length);
+    }
+    if (rest) frag.appendChild(doc.createTextNode(rest));
+    n.replaceWith(frag);
   });
 }
 
@@ -3361,9 +3466,48 @@ async function vulDocument(id, key, data, vlaggen) {
   } });
   await docsBatch(id, requests);
 
-  // Paginering: alinea's niet splitsen, titels bij de volgende tekst houden
+  // Paginering: alinea's niet splitsen, titels bij de volgende tekst houden;
+  // wat de tool niet kon invullen wordt rood
   const doc2 = await (await driveFetch(`${DOCS_API}/documents/${id}`)).json();
-  await docsBatch(id, alineaStijlVerzoeken(doc2));
+  const onbekend = [];
+  const rood = [];
+  docsAlineas(doc2).forEach(a => {
+    for (const m of a.tekst.matchAll(/\{\{[^{}]+?\}\}/g)) {
+      onbekend.push(m[0]);
+      const s0 = a.idx[m.index], s1 = a.idx[m.index + m[0].length - 1];
+      if (s0 !== undefined && s1 !== undefined) rood.push({ updateTextStyle: {
+        range: { startIndex: s0, endIndex: s1 + 1 },
+        textStyle: { foregroundColor: { color: { rgbColor: MARKEER_KLEUR } } }, fields: 'foregroundColor' } });
+    }
+  });
+  await docsBatch(id, [...alineaStijlVerzoeken(doc2), ...rood]);
+  return [...new Set(onbekend)];
+}
+
+// Rode markering: deze kleur gebruikt de tool alleen voor niet-ingevulde plekken
+const MARKEER_KLEUR = { red: 0.851, green: 0.188, blue: 0.145 };
+const isMarkeerKleur = ts => {
+  const c = ts && ts.foregroundColor && ts.foregroundColor.color && ts.foregroundColor.color.rgbColor;
+  return !!c && Math.abs((c.red || 0) - MARKEER_KLEUR.red) < 0.01 && Math.abs((c.green || 0) - MARKEER_KLEUR.green) < 0.01 && Math.abs((c.blue || 0) - MARKEER_KLEUR.blue) < 0.01;
+};
+
+// Vóór de PDF: staan er nog {{...}}? Zo niet, dan rode kleur weer normaal maken.
+async function controleerVoorPDF(id) {
+  const doc = await (await driveFetch(`${DOCS_API}/documents/${id}`)).json();
+  const nog = [];
+  docsAlineas(doc).forEach(a => { for (const m of a.tekst.matchAll(/\{\{[^{}]+?\}\}/g)) nog.push(m[0]); });
+  if (nog.length) return [...new Set(nog)];
+  const herstel = [];
+  const loop = content => (content || []).forEach(se => {
+    if (se.paragraph) (se.paragraph.elements || []).forEach(el => {
+      if (el.textRun && isMarkeerKleur(el.textRun.textStyle)) herstel.push({ updateTextStyle: {
+        range: { startIndex: el.startIndex, endIndex: el.endIndex }, textStyle: {}, fields: 'foregroundColor' } });
+    });
+    else if (se.table) (se.table.tableRows || []).forEach(r => (r.tableCells || []).forEach(c => loop(c.content)));
+  });
+  loop(doc.body.content);
+  await docsBatch(id, herstel);
+  return [];
 }
 
 function alineaStijlVerzoeken(doc) {
@@ -3410,6 +3554,13 @@ function toonResultaat() {
   }
   if (!laatsteContract) { box.remove(); return; }
   const c = laatsteContract;
+  box.classList.toggle('let-op', !!(c.onbekend && c.onbekend.length));
+  if (c.onbekend && c.onbekend.length) {
+    box.innerHTML = `<b>Nog invullen:</b> ${c.onbekend.map(escHtml).join(', ')} — deze kon de tool niet invullen en staan in het contract in het <b style="color:#d93025">rood</b>.<br>
+      <a href="${c.url}" target="_blank" rel="noopener">Open het contract in Google Docs ↗</a>, vul ze in en klik daarna hier:
+      <div style="margin-top:8px;"><button class="btn btn-primary" onclick="opnieuwDownloaden()" style="font-size:12px;">PDF downloaden</button></div>`;
+    return;
+  }
   box.innerHTML = c.aanpassen
     ? `<b>✓ Klaargezet in Google Docs:</b> ${escHtml(c.naam)}<br>
        ${c.geopend ? 'Het contract is geopend in een nieuw tabblad.' : `<a href="${c.url}" target="_blank" rel="noopener">Open het contract in Google Docs ↗</a>`}
@@ -3425,8 +3576,14 @@ function toonResultaat() {
 
 async function opnieuwDownloaden() {
   if (!laatsteContract) return;
-  try { await downloadPDF(laatsteContract.id, laatsteContract.naam); showToast('PDF gedownload.'); }
-  catch (e) { showToast('Downloaden mislukt:', true, [e.message]); }
+  try {
+    const nog = await controleerVoorPDF(laatsteContract.id);
+    laatsteContract.onbekend = nog;
+    toonResultaat();
+    if (nog.length) { showToast('Nog niet alles is ingevuld:', true, nog.map(n => n + ' — vul dit in Google Docs in')); return; }
+    await downloadPDF(laatsteContract.id, laatsteContract.naam);
+    showToast('PDF gedownload.');
+  } catch (e) { showToast('Downloaden mislukt:', true, [e.message]); }
 }
 
 // "PDF maken": contract maken en meteen de PDF downloaden
@@ -3464,12 +3621,14 @@ async function maakContract(aanpassen) {
     const map = await uitvoerMap();
     const kopie = await (await driveFetch(`${DRIVE_API}/files/${driveDocIds[key]}/copy?supportsAllDrives=true&fields=id,name,webViewLink`, { json: { name: naam, parents: [map] } })).json();
     bezig('Invullen…');
-    await vulDocument(kopie.id, key, data, contractVlaggen());
+    const onbekend = await vulDocument(kopie.id, key, data, contractVlaggen());
     const url = kopie.webViewLink || `https://docs.google.com/document/d/${kopie.id}/edit`;
-    laatsteContract = { id: kopie.id, naam, url, aanpassen };
+    laatsteContract = { id: kopie.id, naam, url, aanpassen, onbekend };
     if (aanpassen) {
       if (venster && !venster.closed) { venster.location.href = url; laatsteContract.geopend = true; }
       showToast('Contract klaargezet in Google Docs. Pas het aan en download daarna de PDF.');
+    } else if (onbekend.length) {
+      showToast('Contract gemaakt, maar nog niet compleet:', true, onbekend.map(n => n + ' — vul dit in Google Docs in (staat in het rood)'));
     } else {
       bezig('PDF maken…');
       await downloadPDF(kopie.id, naam);
