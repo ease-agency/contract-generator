@@ -1948,10 +1948,17 @@ const ALIASSEN = {
   'maximum aantal uur': 'MAX_UREN',
   'aanpassing uurloon of vastlegging uurloonaanpassing': 'UURLOON_KOP',
   'dag maand jaar': 'BESLUITDATUM',
+  'dd maand jaar': 'BESLUITDATUM',
   'datum besluit': 'BESLUITDATUM',
+  'uurtarief oud': 'UURLOON_OUD',
+  'uurtarief nieuw': 'UURLOON_NIEUW',
+  'uurloon oud': 'UURLOON_OUD',
+  'uurloon nieuw': 'UURLOON_NIEUW',
 };
 // Opmerking-markeringen zoals [a] uit een geëxporteerd document negeren
-const aliasNorm = t => (t || '').replace(/\[[a-z]{1,2}\]/g, '').toLowerCase().replace(/\s*\/\s*/g, '/').replace(/\s+/g, ' ').trim();
+const aliasNorm = t => (t || '').replace(/\[[a-z]{1,2}\]/g, '').toLowerCase().replace(/\s*\/\s*/g, '/').replace(/[_\s]+/g, ' ').trim();
+// In een addendum gaan start, eind en aantal maanden over de verlenging
+const ALIASSEN_ALT = { 'startdatum': 'VERLENG_START', 'einddatum': 'VERLENG_EIND', 'aantal maanden': 'VERLENG_MAANDEN', 'duur maanden': 'VERLENG_MAANDEN' };
 // Naam tussen {{ }} → variabele (of null als onbekend)
 function variabeleVoor(naam, bekend) {
   const n = (naam || '').trim();
@@ -1961,7 +1968,9 @@ function variabeleVoor(naam, bekend) {
   if (bekend.has(up + '_PA')) return up + '_PA';
   if (up === 'WOONPLAATS' && bekend.has('STAD_PA')) return 'STAD_PA';
   const a = ALIASSEN[aliasNorm(n)];
-  return a && bekend.has(a) ? a : null;
+  if (a && bekend.has(a)) return a;
+  const b = ALIASSEN_ALT[aliasNorm(n)];
+  return b && bekend.has(b) ? b : null;
 }
 const VARIABELEN_ALGEMEEN = ['TEKENDATUM', 'VANDAAG', 'BESLUITDATUM'];
 
