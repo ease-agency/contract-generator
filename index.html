@@ -3318,7 +3318,9 @@ function vulTemplateHtml(html, key, data, vlaggen) {
   const stijl = doc.createElement('style');
   // Paginabreedte en marges van het template zelf aanhouden, zodat kop- en voettekst op hun plek staan
   // (de koptekst staat in een document in de bovenmarge, standaard 36pt van de rand)
-  stijl.textContent = 'html{background:#efede8}body{margin:16px auto!important;padding-top:36pt!important;background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.15)}';
+  // Paginascheidingen (Google zet ze onzichtbaar in de export) tonen als grijze strook
+  stijl.textContent = 'html{background:#efede8}body{margin:16px auto!important;padding-top:36pt!important;background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.15);overflow-x:hidden}'
+    + 'hr[style*="page-break"]{display:block!important;border:0!important;height:18px!important;margin:36pt -200pt!important;background:#efede8!important}';
   doc.head.appendChild(stijl);
   return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
 }
@@ -3392,6 +3394,11 @@ function renderPreviewPanel() {
       // Pagina verkleinen als hij breder is dan het voorbeeldvenster
       const d = frame.contentDocument;
       d.documentElement.style.zoom = '';
+      // Template zonder paginabreedte (bijv. "zonder pagina's")? Dan A4 met normale marges.
+      if (frame.contentWindow.getComputedStyle(d.body).maxWidth === 'none') {
+        d.body.style.setProperty('max-width', '451.4pt', 'important');
+        d.body.style.setProperty('padding', '36pt 72pt 72pt 72pt', 'important');
+      }
       const breed = d.body.getBoundingClientRect().width + 32;
       const schaal = Math.min(1, frame.clientWidth / breed);
       if (schaal < 1) d.documentElement.style.zoom = String(schaal);
