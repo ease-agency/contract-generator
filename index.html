@@ -3624,7 +3624,7 @@ function renderPreviewPanel() {
   }
   if (!driveCheckReady(false)) { body.innerHTML = drivePreviewNoticeHTML(); return; }
   const key = driveCurrentKey();
-  const html = vulTemplateHtml(driveHtml[key], key, contractData(), contractVlaggen());
+  const html = vulTemplateHtml(driveHtml[key], key, contractData(), contractVlaggen()).replace(/(^|[}\s,])\.(title|subtitle)\{/g, '$1:where(.$2){');
   let frame = body.querySelector('iframe.preview-frame');
   let scroll = 0;
   if (frame) { try { scroll = frame.contentWindow.scrollY || 0; } catch (e) {} }
@@ -3675,7 +3675,10 @@ function pagineerVoorbeeld(d, w) {
   const cs = w.getComputedStyle(body);
   const px = v => parseFloat(v) || 0;
   const PT = 96 / 72;
-  const breedte = body.getBoundingClientRect().width;
+  // Tabellen die tot de paginarand doorlopen (paarse balk) op hun eigen breedte
+  body.querySelectorAll('table').forEach(t => { if (px(w.getComputedStyle(t).marginLeft) < 0) t.style.setProperty('width', 'max-content', 'important'); });
+  const maxB = px(cs.maxWidth);
+  const breedte = maxB > 0 ? maxB + px(cs.paddingLeft) + px(cs.paddingRight) : body.getBoundingClientRect().width;
   const hoogte = Math.round(breedte * 297 / 210);
   const padL = px(cs.paddingLeft), padR = px(cs.paddingRight), padT = px(cs.paddingTop), padB = px(cs.paddingBottom);
   const achtergrond = cs.backgroundColor;
@@ -3697,7 +3700,7 @@ function pagineerVoorbeeld(d, w) {
     pg.style.cssText = `position:relative;box-sizing:border-box;width:${breedte}px;height:${hoogte}px;margin:16px auto;background:${achtergrond};box-shadow:0 1px 3px rgba(60,64,67,.3),0 1px 2px rgba(60,64,67,.15);overflow:hidden;`;
     paginas.appendChild(pg);
     let boven = Math.max(padT, 36 * PT), onder = Math.max(padB, 36 * PT);
-    if (kop) {
+    if (kop && paginas.children.length > 1) {
       const k = kop.cloneNode(true);
       k.style.cssText += `;position:absolute;top:${36 * PT}px;left:${padL}px;right:${padR}px;`;
       pg.appendChild(k);
