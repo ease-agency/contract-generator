@@ -742,6 +742,11 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
           <span class="err-msg" id="err-fr-einddatum">Vul een einddatum in</span>
         </div>
       </div>
+      <div class="field" style="margin-top:12px;">
+        <label for="fr-uurtarief">Uurtarief (excl. btw)</label>
+        <div class="euro-wrap"><input type="number" id="fr-uurtarief" placeholder="0.00" min="0" step="0.01"></div>
+        <span class="err-msg" id="err-fr-uurtarief">Vul een uurtarief in</span>
+      </div>
     </div>
 
     <!-- ── Afsluitverklaring kaart ── -->
@@ -1153,6 +1158,7 @@ function zetAvVersie() {
 }
 const FIELDS_FREELANCE = [
   { id: 'fr-naam',      testValue: 'Anna de Vries' },
+  { id: 'fr-uurtarief', testValue: '40.00' },
   { id: 'fr-postcode',  testValue: '1018 GV' },
   { id: 'fr-adres',     testValue: 'Sarphatistraat 72' },
   { id: 'fr-stad',      testValue: 'Amsterdam' },
@@ -1924,7 +1930,7 @@ const UITVOER_MAP_NAAM = 'Contracten (Contract Generator)';
 // Welke variabelen de tool per soort contract invult
 const VARIABELEN = {
   dienstverband: ['AANHEF', 'NAAM', 'GEBOORTEDATUM', 'ADRES', 'POSTCODE', 'WOONPLAATS', 'FUNCTIE', 'STARTDATUM', 'EINDDATUM', 'EINDDATUM_PLUS1', 'DUUR_MAANDEN', 'UURLOONDATUM', 'UURLOON', 'MIN_UREN', 'MAX_UREN', 'SALARISDATUM', 'SALARIS'],
-  freelance:     ['NAAM_PA', 'ADRES_PA', 'POSTCODE_PA', 'STAD_PA', 'STARTDATUM', 'EINDDATUM'],
+  freelance:     ['NAAM_PA', 'ADRES_PA', 'POSTCODE_PA', 'STAD_PA', 'STARTDATUM', 'EINDDATUM', 'UURTARIEF'],
   afsluit:       ['NAAM_PA', 'KLANTNAAM', 'DATUM_OVEREENKOMST', 'EINDDATUM'],
   addendum:      ['NAAM_PA', 'DATUM_OVK', 'INGANGSDATUM_OVK', 'OVK_TERM', 'DATUM_WIJZIGING', 'PERCENTAGE', 'UURLOON_OUD', 'UURLOON_NIEUW', 'UURLOON_KOP', 'VERLENG_START', 'VERLENG_EIND', 'VERLENG_MAANDEN', 'MIN_UREN', 'MAX_UREN'],
   klant:         ['BEDRIJFSNAAM', 'CONTACTPERSOON', 'KVK', 'ADRES', 'POSTCODE', 'WOONPLAATS', 'FUNCTIE', 'STARTDATUM', 'EINDDATUM', 'DUUR_MAANDEN', 'TARIFDATUM', 'AV_VERSIE'],
@@ -1972,6 +1978,7 @@ function variabeleVoor(naam, bekend) {
   const b = ALIASSEN_ALT[aliasNorm(n)];
   return b && bekend.has(b) ? b : null;
 }
+const SLOT_WOORDEN = /handtekening|ondertekening|signature|plaats,? datum|place,? date/i;
 const VARIABELEN_ALGEMEEN = ['TEKENDATUM', 'VANDAAG', 'BESLUITDATUM'];
 
 // Voorwaarden voor [ALS ...]-stukken in een template
@@ -3016,6 +3023,7 @@ function fillFromPA(pa) {
   setF('fr-adres', pa.adres);
   setF('fr-postcode', pa.postcode);
   setF('fr-stad', pa.woonplaats);
+  if (pa.uurloon) setF('fr-uurtarief', pa.uurloon);
   if (pa.kvk) setF('fr-kvk', pa.kvk);
   // Auto-select contract op basis van contracttype
   if (pa.contracttype) {
@@ -3345,6 +3353,7 @@ function getCurrentData() {
       STAD_PA:     document.getElementById('fr-stad')?.value || '',
       STARTDATUM:  fmt(document.getElementById('fr-startdatum')?.value || ''),
       EINDDATUM:   fmt(document.getElementById('fr-einddatum')?.value || ''),
+      UURTARIEF:   fmtE(document.getElementById('fr-uurtarief')?.value || ''),
     };
   }
 
@@ -3701,6 +3710,19 @@ function pagineerVoorbeeld(d, w) {
   let kop = null, voet = null;
   if (kinderen[0].tagName === 'DIV') kop = kinderen.shift();
   if (kinderen.length > 1 && kinderen[kinderen.length - 1].tagName === 'DIV') voet = kinderen.pop();
+  (() => {
+    const lengte = el => el.textContent.replace(/[\s ]+/g, ' ').trim().length;
+    let i = kinderen.length - 1;
+    while (i >= 0 && lengte(kinderen[i]) <= 120 && !/^(UL|OL)$/.test(kinderen[i].tagName)) i--;
+    const staart = kinderen.slice(i + 1);
+    if (staart.length < 2 || !SLOT_WOORDEN.test(staart.map(e => e.textContent).join(' '))) return;
+    if (staart.reduce((s, e) => s + e.getBoundingClientRect().height, 0) > hoogte * 0.7) return;
+    const blok = d.createElement('div');
+    blok.className = 'ct-slot';
+    staart[0].before(blok);
+    staart.forEach(e => blok.appendChild(e));
+    kinderen.splice(i + 1, staart.length, blok);
+  })();
 
   const paginas = d.createElement('div');
   body.appendChild(paginas);
@@ -4009,6 +4031,10 @@ function alineaStijlVerzoeken(doc) {
   const content = doc.body.content || [];
   const reqs = [];
   let vorigeKop = false;
+  const seTekst = se => se.paragraph ? (se.paragraph.elements || []).map(e => e.textRun ? e.textRun.content : '').join('').replace(/[\s ]+/g, ' ').trim() : '';
+  let slot = content.length;
+  for (let i = content.length - 1; i >= 0; i--) { if (seTekst(content[i]).length > 120 || content[i].sectionBreak) break; slot = i; }
+  if (content.length - slot < 2 || !SLOT_WOORDEN.test(content.slice(slot).map(seTekst).join(' '))) slot = Infinity;
   content.forEach((se, i) => {
     if (!se.paragraph) { vorigeKop = false; return; }
     const p = se.paragraph;
@@ -4021,7 +4047,7 @@ function alineaStijlVerzoeken(doc) {
       || (vet && tekst.length <= 100 && !/[.;,]$/.test(tekst))
       || (tekst.length <= 80 && /:$/.test(tekst)));
     const voorTabel = !!(content[i + 1] && content[i + 1].table);
-    const houdBijVolgende = kop || voorTabel || (leeg && vorigeKop);
+    const houdBijVolgende = kop || voorTabel || (leeg && vorigeKop) || (i >= slot && i < content.length - 1);
     const stijlUpdate = {}; const velden = [];
     if (!leeg) { stijlUpdate.keepLinesTogether = true; velden.push('keepLinesTogether'); }
     if (houdBijVolgende) { stijlUpdate.keepWithNext = true; velden.push('keepWithNext'); }
@@ -4172,7 +4198,7 @@ const VELD_VARS = {
   'uurloondatum': ['UURLOONDATUM'], 'uurloon': ['UURLOON'], 'min-uren': ['MIN_UREN'], 'max-uren': ['MAX_UREN'],
   'salarisdatum': ['SALARISDATUM'], 'salaris': ['SALARIS'],
   'fr-naam': ['NAAM_PA'], 'fr-postcode': ['POSTCODE_PA'], 'fr-adres': ['ADRES_PA'], 'fr-stad': ['STAD_PA'],
-  'fr-startdatum': ['STARTDATUM'], 'fr-einddatum': ['EINDDATUM'],
+  'fr-startdatum': ['STARTDATUM'], 'fr-einddatum': ['EINDDATUM'], 'fr-uurtarief': ['UURTARIEF'],
   'af-naam-pa': ['NAAM_PA'], 'af-naam-klant': ['KLANTNAAM'], 'af-datum-overeenkomst': ['DATUM_OVEREENKOMST'], 'af-einddatum': ['EINDDATUM'],
   'ad-naam-pa': ['NAAM_PA'], 'ad-datum-ovk': ['DATUM_OVK'], 'ad-ingangsdatum-ovk': ['INGANGSDATUM_OVK', 'VERLENG_START', 'VERLENG_EIND'],
   'ad-datum-wijziging': ['DATUM_WIJZIGING'], 'ad-percentage': ['PERCENTAGE'], 'ad-uurloon-oud': ['UURLOON_OUD'],
