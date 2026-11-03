@@ -3323,7 +3323,7 @@ function vulTemplateHtml(html, key, data, vlaggen) {
   // Paginabreedte en marges van het template zelf aanhouden, zodat kop- en voettekst op hun plek staan
   // (de koptekst staat in een document in de bovenmarge, standaard 36pt van de rand)
   // Paginascheidingen (Google zet ze onzichtbaar in de export) tonen als grijze strook
-  stijl.textContent = 'html{background:#efede8}body{margin:16px auto!important;padding-top:36pt!important;background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.15);overflow-x:hidden}'
+  stijl.textContent = 'html{background:#efede8}body{margin:16px auto!important;padding-top:36pt!important;box-shadow:0 1px 4px rgba(0,0,0,.15);overflow-x:hidden}'
     + 'hr[style*="page-break"]{display:block!important;border:0!important;height:18px!important;margin:36pt -200pt!important;background:#efede8!important}';
   doc.head.appendChild(stijl);
   return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
@@ -3398,6 +3398,9 @@ function renderPreviewPanel() {
       // Pagina verkleinen als hij breder is dan het voorbeeldvenster
       const d = frame.contentDocument;
       d.documentElement.style.zoom = '';
+      // Paginakleur van het template aanhouden; alleen wit als het template er geen heeft
+      const achtergrond = frame.contentWindow.getComputedStyle(d.body).backgroundColor;
+      if (!achtergrond || achtergrond === 'transparent' || achtergrond === 'rgba(0, 0, 0, 0)') d.body.style.backgroundColor = '#fff';
       // Template zonder paginabreedte (bijv. "zonder pagina's")? Dan A4 met normale marges.
       if (frame.contentWindow.getComputedStyle(d.body).maxWidth === 'none') {
         d.body.style.setProperty('max-width', '451.4pt', 'important');
