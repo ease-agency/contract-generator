@@ -207,14 +207,14 @@ input.auto-filled:focus, select.auto-filled:focus { border-color: var(--purple);
   </header>
 
   <div class="tab-bar">
-    <button class="tab-btn active" id="tab-generator" onclick="switchTab('generator')">PA Contract</button>
+    <button class="tab-btn active" id="tab-pa" onclick="switchTab('pa')">PA's</button>
+    <button class="tab-btn" id="tab-generator" onclick="switchTab('generator')">PA Contract</button>
     <button class="tab-btn" id="tab-klant" onclick="switchTab('klant')">Klant Contract</button>
-    <button class="tab-btn" id="tab-pa" onclick="switchTab('pa')">PA's</button>
     <button class="tab-btn" id="tab-editor" onclick="switchTab('editor')">Teksten</button>
   </div>
 
   <!-- ══ GENERATOR ══ -->
-  <div id="view-generator">
+  <div id="view-generator" class="hidden">
     <div class="split-left">
 
     <!-- Stap-indicator — alleen bij PA Documenten -->
@@ -713,11 +713,11 @@ input.auto-filled:focus, select.auto-filled:focus { border-color: var(--purple);
   </div><!-- /view-generator -->
 
   <!-- ══ PA DATABASE ══ -->
-  <div id="view-pa" class="hidden">
+  <div id="view-pa">
     <div class="card" id="gs-sync-card" style="margin-bottom:1rem;"><!-- rendered by renderSyncCard() --></div>
     <div class="card" style="margin-bottom:1rem;">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <div class="card-title" style="margin-bottom:0;flex:1;">PA's beheren</div>
+        <div class="card-title" style="margin-bottom:0;flex:1;">PA's beheren <span id="pa-aantal" style="font-family:inherit;text-transform:none;letter-spacing:0;color:#888;font-weight:400;"></span></div>
         <button class="btn btn-primary" onclick="openPAForm(null)" style="font-size:12px;padding:0 14px;">+ Nieuw profiel</button>
       </div>
       <input type="text" id="pa-search" placeholder="Zoek op naam..." oninput="renderPATable()" style="width:100%;height:36px;padding:0 12px;border:1px solid #e0ddd7;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:12px;">
@@ -725,6 +725,7 @@ input.auto-filled:focus, select.auto-filled:focus { border-color: var(--purple);
         <table id="pa-table" style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead>
             <tr style="border-bottom:2px solid #e5e3de;text-align:left;">
+              <th style="padding:6px 10px;font-weight:700;color:var(--purple);width:1%;text-align:right;">#</th>
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Naam</th>
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Uurloon</th>
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Contract</th>
@@ -2386,7 +2387,7 @@ function renderSyncCard() {
         <span style="font-size:13px;color:#444;font-weight:600;">Verbonden</span>
       </div>
       <button id="gs-sync-btn" class="btn btn-primary" onclick="gsSync()" style="font-size:12px;">↻ Nu synchroniseren</button>
-      ${config?.folderId ? `<button class="btn btn-secondary" onclick="driveSyncTexts()" style="font-size:12px;">↻ Teksten ophalen</button>` : ''}
+      ${config?.folderId ? `<button class="btn btn-secondary" onclick="driveSyncTexts()" style="font-size:12px;">↻ Templates ophalen</button>` : ''}
       <button class="btn btn-secondary" onclick="gsSignOut()" style="font-size:12px;color:#c0392b;">Uitloggen</button>
     </div>
     <div class="gs-last-sync" style="margin-top:6px;">Laatste sync: ${lastSyncLabel()}</div>`;
@@ -2621,6 +2622,8 @@ function renderPATable() {
 
   const tbody = document.getElementById('pa-table-body');
   const empty = document.getElementById('pa-table-empty');
+  const aantalEl = document.getElementById('pa-aantal');
+  if (aantalEl) aantalEl.textContent = !paDatabase.length ? '' : (q ? `(${rows.length} van ${paDatabase.length})` : `(${paDatabase.length})`);
   if (!tbody) return;
 
   if (paDatabase.length === 0) {
@@ -2631,7 +2634,7 @@ function renderPATable() {
   if (empty) empty.style.display = 'none';
 
   const _ctLabel = { 'pa-oproep': 'Nuluren', 'pa-minmax': 'Min-max', 'pa-freelance': 'ZZP' };
-  tbody.innerHTML = rows.map(pa => {
+  tbody.innerHTML = rows.map((pa, nr) => {
     const naam = pa.aanhef ? pa.aanhef + ' ' + pa.voornaam + ' ' + pa.achternaam : pa.voornaam + ' ' + pa.achternaam;
     const loon = pa.uurloon ? '€ ' + parseFloat(pa.uurloon).toFixed(2) : '—';
     const ct = _ctLabel[pa.contracttype] || '—';
@@ -2640,6 +2643,7 @@ function renderPATable() {
     const eind  = pa.einddatum  ? formatDateDisplay(pa.einddatum)  : '—';
     const duur  = pa.contractduur ? (pa.contractduur === 'overig' && pa.contractduurCustom ? pa.contractduurCustom + ' mnd' : pa.contractduur + ' mnd') : '—';
     return `<tr>
+      <td style="color:#999;text-align:right;font-variant-numeric:tabular-nums;padding-right:14px">${nr + 1}</td>
       <td style="font-weight:500">${escHtml(naam)}</td>
       <td style="font-variant-numeric:tabular-nums">${escHtml(loon)}</td>
       <td>${escHtml(ct)}${urenSub}</td>
@@ -2665,7 +2669,7 @@ function renderPATable() {
   }).join('');
 
   if (rows.length === 0 && q) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#999;padding:20px">Geen PA's gevonden voor "${escHtml(q)}"</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#999;padding:20px">Geen PA's gevonden voor "${escHtml(q)}"</td></tr>`;
   }
 }
 
@@ -3400,7 +3404,7 @@ function renderPreviewPanel() {
         d.body.style.setProperty('padding', '36pt 72pt 72pt 72pt', 'important');
       }
       const breed = d.body.getBoundingClientRect().width + 32;
-      const schaal = Math.min(1, frame.clientWidth / breed);
+      const schaal = frame.clientWidth ? Math.min(1, frame.clientWidth / breed) : 1;
       if (schaal < 1) d.documentElement.style.zoom = String(schaal);
       frame.contentWindow.scrollTo(0, scroll);
     } catch (e) {}
@@ -3709,6 +3713,8 @@ async function maakContract(aanpassen) {
   // Oude PA-kopieën uit de browser opruimen (PA's komen alleen nog uit de Sheet)
   loadPAFromStorage();
   zetAvVersie();
+  // Starten op het tabblad PA's
+  switchTab('pa');
 })();
 </script>
 
