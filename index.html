@@ -1597,6 +1597,7 @@ function gsSignOut() {
   gsClearToken();
   _gsSyncedThisSession = false;
   paDatabase.length = 0;
+  try { localStorage.removeItem('ease_template_cache'); } catch (e) {}
   if (typeof clearSelectedPA === 'function') { try { clearSelectedPA(); } catch(e) {} }
   renderPATable();
   renderSyncCard();
@@ -2025,6 +2026,17 @@ function driveControleer(key, naam, html) {
   return meldingen;
 }
 
+// Bewaarde templates (alleen in deze browser), zodat ongewijzigde templates
+// niet elke keer opnieuw bij Google opgehaald hoeven te worden.
+const TEMPLATE_CACHE = 'ease_template_cache';
+function templateCacheLezen() {
+  try { return JSON.parse(localStorage.getItem(TEMPLATE_CACHE) || '{}') || {}; } catch (e) { return {}; }
+}
+function templateCacheSchrijven(cache) {
+  try { localStorage.setItem(TEMPLATE_CACHE, JSON.stringify(cache)); }
+  catch (e) { try { localStorage.removeItem(TEMPLATE_CACHE); } catch (e2) {} }
+}
+
 let _driveSyncBusy = null;
 function driveSyncTexts(silent = false) {
   if (_driveSyncBusy) return _driveSyncBusy;
@@ -2063,16 +2075,22 @@ async function _driveSyncTexts(silent = false) {
     const html = {}, ids = {}, namen = {}, problems = {}, metas = {}, lettertypes = {};
     const missing = [];
     const warnings = dubbel.map(n => `"${n}" genegeerd: er is al een document voor hetzelfde contract`);
-    for (const key of DRIVE_MANAGED) {
+    // Het gekozen contract eerst, daarna de rest; zes tegelijk
+    const huidige = driveCurrentKey();
+    const volgorde = [...DRIVE_MANAGED].sort((x, y) => (y === huidige) - (x === huidige));
+    const cache = templateCacheLezen();
+    const nieuweCache = {};
+    const resultaten = {};
+    const laadEen = async key => {
       const file = byKey.get(key);
-      if (!file) { missing.push(DOCS[key].naam); problems[key] = 'Geen template voor dit contract gevonden in de Drive-map (of de naam wordt niet herkend).'; continue; }
+      if (!file) { missing.push(DOCS[key].naam); problems[key] = 'Geen template voor dit contract gevonden in de Drive-map (of de naam wordt niet herkend).'; return; }
       namen[key] = file.name;
       let docId = file.id;
       if (file.mimeType === 'application/vnd.google-apps.shortcut') {
         const sd = file.shortcutDetails || {};
         if (sd.targetMimeType !== DOC_MIME) {
-          warnings.push(`"${file.name}" is geen Google Doc (bijv. een Word-bestand)`); missing.push(DOCS[key].naam);
-          problems[key] = `"${file.name}" is geen Google Doc maar bijvoorbeeld een Word-bestand. Open het en kies Bestand → Opslaan als Google Documenten.`; continue;
+          resultaten[key] = { waarschuwingen: [`"${file.name}" is geen Google Doc (bijv. een Word-bestand)`] }; missing.push(DOCS[key].naam);
+          problems[key] = `"${file.name}" is geen Google Doc maar bijvoorbeeld een Word-bestand. Open het en kies Bestand → Opslaan als Google Documenten.`; return;
         }
         docId = sd.targetId;
       }
@@ -2081,16 +2099,31 @@ async function _driveSyncTexts(silent = false) {
         const meta = await (await driveFetch(`${DRIVE_API}/files/${docId}?fields=name,modifiedTime,lastModifyingUser(displayName)&supportsAllDrives=true`)).json();
         metas[key] = { naam: meta.name, gewijzigd: meta.modifiedTime, door: meta.lastModifyingUser?.displayName || '' };
       } catch (err) { if (err.auth) throw err; }
-      try {
-        html[key] = await (await driveFetch(`${DRIVE_API}/files/${docId}/export?mimeType=text/html&supportsAllDrives=true`)).text();
-      } catch (err) {
-        if (err.auth) throw err;
-        warnings.push(`"${file.name}" kon niet worden geopend (${err.message})`); missing.push(DOCS[key].naam);
-        problems[key] = `"${file.name}" kon niet worden geopend (${err.message}).`; delete ids[key]; continue;
+      // Ongewijzigd sinds de vorige keer? Dan de bewaarde versie gebruiken.
+      const bewaard = cache[docId];
+      if (bewaard && metas[key] && bewaard.m === metas[key].gewijzigd) {
+        html[key] = bewaard.h;
+      } else {
+        try {
+          html[key] = await (await driveFetch(`${DRIVE_API}/files/${docId}/export?mimeType=text/html&supportsAllDrives=true`)).text();
+        } catch (err) {
+          if (err.auth) throw err;
+          resultaten[key] = { waarschuwingen: [`"${file.name}" kon niet worden geopend (${err.message})`] }; missing.push(DOCS[key].naam);
+          problems[key] = `"${file.name}" kon niet worden geopend (${err.message}).`; delete ids[key]; return;
+        }
       }
-      warnings.push(...driveControleer(key, file.name, html[key]));
+      if (metas[key]) nieuweCache[docId] = { m: metas[key].gewijzigd, h: html[key] };
+      resultaten[key] = { waarschuwingen: driveControleer(key, file.name, html[key]) };
       try { lettertypes[key] = templateLettertypes(html[key]); } catch (e) {}
-    }
+      // Meteen bruikbaar maken (het voorbeeld hoeft niet op de rest te wachten)
+      driveHtml[key] = html[key]; driveDocIds[key] = docId; driveLoaded.add(key);
+      if (key === driveCurrentKey() && typeof scheduleLivePreview === 'function') scheduleLivePreview();
+    };
+    const wachtrij = [...volgorde];
+    const werkers = Array.from({ length: 6 }, async () => { while (wachtrij.length) await laadEen(wachtrij.shift()); });
+    await Promise.all(werkers);
+    volgorde.forEach(k => { if (resultaten[k]) warnings.push(...resultaten[k].waarschuwingen); });
+    templateCacheSchrijven(nieuweCache);
 
     driveHtml = html;
     driveLoaded = new Set(Object.keys(html));
@@ -3283,7 +3316,9 @@ function vulTemplateHtml(html, key, data, vlaggen) {
   markeerOnbekend(doc);
   previewLettertypes(doc);
   const stijl = doc.createElement('style');
-  stijl.textContent = 'html{background:#fff}body{max-width:none!important;margin:0!important;padding:28px 36px!important;background:#fff!important}';
+  // Paginabreedte en marges van het template zelf aanhouden, zodat kop- en voettekst op hun plek staan
+  // (de koptekst staat in een document in de bovenmarge, standaard 36pt van de rand)
+  stijl.textContent = 'html{background:#efede8}body{margin:16px auto!important;padding-top:36pt!important;background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.15)}';
   doc.head.appendChild(stijl);
   return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
 }
@@ -3352,7 +3387,17 @@ function renderPreviewPanel() {
     body.innerHTML = '<iframe class="preview-frame" sandbox="allow-same-origin" title="Voorbeeld van het contract"></iframe>';
     frame = body.querySelector('iframe.preview-frame');
   }
-  frame.onload = () => { try { frame.contentWindow.scrollTo(0, scroll); } catch (e) {} };
+  frame.onload = () => {
+    try {
+      // Pagina verkleinen als hij breder is dan het voorbeeldvenster
+      const d = frame.contentDocument;
+      d.documentElement.style.zoom = '';
+      const breed = d.body.getBoundingClientRect().width + 32;
+      const schaal = Math.min(1, frame.clientWidth / breed);
+      if (schaal < 1) d.documentElement.style.zoom = String(schaal);
+      frame.contentWindow.scrollTo(0, scroll);
+    } catch (e) {}
+  };
   frame.srcdoc = html;
 }
 
