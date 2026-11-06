@@ -323,6 +323,13 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
 .pa-acties .btn { height: 36px; font-size: 13px; padding: 0 12px; }
 @media (max-width: 960px) { .split-left { flex: none; padding-right: 0; } .split-right { height: auto; } }
 
+.terug-knop { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 2px; margin-bottom: 4px; background: none; border: 0; color: var(--purple); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.terug-knop:hover { text-decoration: underline; }
+.stappen li.klaar:hover { background: #E4DCF0; }
+.stappen li[role="button"]:focus-visible, .terug-knop:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+
+.pa-kaart-sub { display: flex; flex-direction: column; gap: 1px; }
+
 </style>
 </head>
 <body>
@@ -353,6 +360,7 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
   <div id="view-nieuw">
     <div class="pagina-kop">
       <div>
+        <button type="button" id="terug-knop" class="terug-knop" onclick="stapTerug()" hidden><span aria-hidden="true">←</span> Terug</button>
         <h1 class="paginatitel">Nieuw contract</h1>
         <p class="paginasub">Kies voor wie, kies het document, controleer de gegevens.</p>
       </div>
@@ -961,7 +969,6 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
             <tr style="border-bottom:2px solid #e5e3de;text-align:left;">
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);width:1%;text-align:right;">#</th>
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Naam</th>
-              <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Uurloon</th>
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Contract</th>
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Startdatum</th>
               <th style="padding:6px 10px;font-weight:700;color:var(--purple);">Einddatum</th>
@@ -4396,6 +4403,7 @@ function ga(view) {
   if (view === 'gemaakt') renderGemaakt();
   renderNav();
   window.scrollTo(0, 0);
+  histZet(false);
 }
 
 function renderNav() {
@@ -4413,21 +4421,48 @@ function renderNav() {
 }
 
 function naarStap(n) {
-  UI.stap = n;
-  if (UI.view !== 'nieuw') ga('nieuw'); else { renderNieuw(); window.scrollTo(0, 0); }
+  UI.stap = Math.max(1, Math.min(4, n));
+  if (UI.view !== 'nieuw') ga('nieuw'); else { renderNieuw(); window.scrollTo(0, 0); histZet(false); }
 }
+function stapTerug() { naarStap(UI.stap - 1); }
+
+// Terugknop van de browser: één stap (of scherm) terug in plaats van de tool verlaten
+let _histStil = false;
+function histZet(vervang) {
+  if (_histStil) return;
+  const st = { ease: 1, view: UI.view, stap: UI.stap };
+  try {
+    const nu = history.state;
+    if (nu && nu.ease && nu.view === st.view && nu.stap === st.stap) return;
+    if (vervang || !(nu && nu.ease)) history.replaceState(st, ''); else history.pushState(st, '');
+  } catch (e) {}
+}
+window.addEventListener('popstate', e => {
+  const st = e.state;
+  if (!st || !st.ease) return;
+  _histStil = true;
+  try {
+    UI.stap = st.stap || 1;
+    if (st.view !== UI.view) ga(st.view); else if (st.view === 'nieuw') { renderNieuw(); window.scrollTo(0, 0); }
+  } finally { _histStil = false; }
+});
 
 function renderNieuw() {
   for (let i = 1; i <= 4; i++) {
     const li = document.getElementById('stap-pil-' + i);
     if (!li) continue;
-    const klaar = i < UI.stap && UI.stap < 4, actief = i === UI.stap;
+    const klaar = i < UI.stap, actief = i === UI.stap;
     li.classList.toggle('actief', actief);
-    li.classList.toggle('klaar', klaar || (UI.stap === 4 && i < 4));
-    li.querySelector('.stap-nr').textContent = (i < UI.stap) ? '✓' : String(i);
+    li.classList.toggle('klaar', klaar);
+    li.querySelector('.stap-nr').textContent = klaar ? '✓' : String(i);
     li.onclick = klaar ? () => naarStap(i) : null;
+    li.onkeydown = klaar ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); naarStap(i); } } : null;
+    if (klaar) { li.setAttribute('role', 'button'); li.tabIndex = 0; li.title = 'Terug naar ' + li.textContent.replace(/^✓/, '').trim(); }
+    else { li.removeAttribute('role'); li.removeAttribute('tabindex'); li.removeAttribute('title'); }
     if (actief) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
   }
+  const terug = document.getElementById('terug-knop');
+  if (terug) terug.hidden = UI.stap === 1;
   document.getElementById('stap-wie').hidden = UI.stap !== 1;
   document.getElementById('stap-document').hidden = UI.stap !== 2;
   document.getElementById('stap-klaar').hidden = UI.stap !== 4;
@@ -4453,26 +4488,33 @@ function paSignaal(pa) {
   if (d === 0) return 'Loopt vandaag af';
   return d <= 21 ? `Loopt af over ${d} ${d === 1 ? 'dag' : 'dagen'}` : `Loopt af over ${Math.round(d / 7)} weken`;
 }
-function paSub(pa) {
-  return [CT_LABEL[pa.contracttype], pa.uurloon ? '€ ' + parseFloat(pa.uurloon).toFixed(2).replace('.', ',') : '', pa.einddatum ? 'loopt tot ' + formatDateDisplay(pa.einddatum) : '']
-    .filter(Boolean).join(' · ');
+// Contractduur in maanden: uit de Sheet, of berekend uit start- en einddatum
+function paMaanden(pa) {
+  if (pa.contractduur) return pa.contractduur === 'overig' ? (parseInt(pa.contractduurCustom, 10) || null) : (parseInt(pa.contractduur, 10) || null);
+  if (!pa.startdatum || !pa.einddatum) return null;
+  const a = new Date(pa.startdatum + 'T00:00:00'), b = new Date(pa.einddatum + 'T00:00:00');
+  if (isNaN(a) || isNaN(b) || b < a) return null;
+  b.setDate(b.getDate() + 1);
+  const m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) + (b.getDate() - a.getDate()) / 30;
+  return Math.max(1, Math.round(m));
 }
+function paDuurTekst(pa) { const m = paMaanden(pa); return m ? m + (m === 1 ? ' maand' : ' maanden') : ''; }
+function paRegels(pa) {
+  return [CT_LABEL[pa.contracttype], paDuurTekst(pa), pa.einddatum ? 'loopt tot ' + formatDateDisplay(pa.einddatum) : ''].filter(Boolean);
+}
+function paSub(pa) { return paRegels(pa).join(' · '); }
 
 function kiesVoor(v) {
-  UI.voor = v;
-  document.getElementById('seg-pa').classList.toggle('actief', v === 'pa');
-  document.getElementById('seg-klant').classList.toggle('actief', v === 'klant');
-  document.getElementById('seg-pa').setAttribute('aria-pressed', String(v === 'pa'));
-  document.getElementById('seg-klant').setAttribute('aria-pressed', String(v === 'klant'));
-  document.getElementById('wie-pa').hidden = v !== 'pa';
-  document.getElementById('wie-klant').hidden = v !== 'klant';
-  if (v === 'pa') renderWie();
+  // "Een klant" gaat meteen door naar de klantdocumenten
+  if (v === 'klant') { UI.voor = 'klant'; naarStap(2); return; }
+  UI.voor = 'pa';
+  renderWie();
 }
 
 function renderWie() {
   kiesVoorKnoppen();
   const el = document.getElementById('wie-lijst');
-  if (!el || UI.voor !== 'pa') return;
+  if (!el) return;
   if (!paDatabase.length) {
     el.innerHTML = gsLoadToken()
       ? `<div class="leeg-melding">De PA-lijst is nog leeg. <button type="button" class="link-knop" onclick="gsSync()">Synchroniseren met de Sheet</button></div>`
@@ -4486,7 +4528,7 @@ function renderWie() {
     const sig = paSignaal(pa);
     return `<button type="button" class="pa-kaart" onclick="kiesPA('${pa.id}')">
       <span class="pa-kaart-kop"><span class="pa-kaart-naam">${escHtml(paNaam(pa))}</span><span class="pa-kaart-nr">#${nr}</span></span>
-      <span class="pa-kaart-sub">${escHtml(paSub(pa) || pa.woonplaats || '')}</span>
+      <span class="pa-kaart-sub">${(paRegels(pa).length ? paRegels(pa) : [pa.woonplaats || '']).map(r => `<span class="pa-kaart-regel">${escHtml(r)}</span>`).join('')}</span>
       ${sig ? `<span class="signaal">${escHtml(sig)}</span>` : ''}
     </button>`;
   }).join('');
@@ -4494,10 +4536,11 @@ function renderWie() {
 function kiesVoorKnoppen() {
   const pa = document.getElementById('seg-pa'), kl = document.getElementById('seg-klant');
   if (!pa || !kl) return;
-  pa.classList.toggle('actief', UI.voor === 'pa'); kl.classList.toggle('actief', UI.voor === 'klant');
-  pa.setAttribute('aria-pressed', String(UI.voor === 'pa')); kl.setAttribute('aria-pressed', String(UI.voor === 'klant'));
-  document.getElementById('wie-pa').hidden = UI.voor !== 'pa';
-  document.getElementById('wie-klant').hidden = UI.voor !== 'klant';
+  // In stap 1 staat altijd de PA-lijst; "Een klant" is een snelkoppeling naar stap 2
+  pa.classList.add('actief'); kl.classList.remove('actief');
+  pa.setAttribute('aria-pressed', 'true'); kl.setAttribute('aria-pressed', 'false');
+  document.getElementById('wie-pa').hidden = false;
+  document.getElementById('wie-klant').hidden = true;
 }
 
 function kiesPA(id) {
@@ -4682,14 +4725,12 @@ renderPATable = function () {
   if (!paDatabase.length) { tbody.innerHTML = ''; if (empty) { empty.style.display = ''; empty.textContent = gsLoadToken() ? 'Nog geen PA\'s — klik op "Synchroniseren met Sheet".' : 'Log in met Google om de PA-lijst te laden.'; } return; }
   if (empty) empty.style.display = 'none';
   tbody.innerHTML = rows.map(({ pa, nr }) => {
-    const loon = pa.uurloon ? '€ ' + parseFloat(pa.uurloon).toFixed(2).replace('.', ',') : '—';
     const urenSub = pa.minUren && pa.maxUren ? `<div style="font-size:12px;color:#6B6475;">${escHtml(pa.minUren)}–${escHtml(pa.maxUren)} u/w</div>` : '';
-    const duur = pa.contractduur ? (pa.contractduur === 'overig' && pa.contractduurCustom ? pa.contractduurCustom + ' mnd' : pa.contractduur + ' mnd') : '—';
+    const duur = paDuurTekst(pa) || '—';
     const sig = paSignaal(pa);
     return `<tr>
       <td style="color:#6B6475;text-align:right;font-variant-numeric:tabular-nums">${nr}</td>
       <td style="font-weight:700">${escHtml(paNaam(pa))}</td>
-      <td style="font-variant-numeric:tabular-nums">${escHtml(loon)}</td>
       <td>${escHtml(CT_LABEL[pa.contracttype] || '—')}${urenSub}</td>
       <td>${escHtml(pa.startdatum ? formatDateDisplay(pa.startdatum) : '—')}</td>
       <td>${escHtml(pa.einddatum ? formatDateDisplay(pa.einddatum) : '—')}${sig ? `<div><span class="signaal" style="display:inline-block;margin-top:4px">${escHtml(sig)}</span></div>` : ''}</td>
@@ -4700,7 +4741,7 @@ renderPATable = function () {
         <button type="button" class="btn btn-secondary btn-danger" onclick="deletePAProfile('${pa.id}')" aria-label="${escHtml(paNaam(pa))} verwijderen" title="Verwijderen">Verwijderen</button>
       </div></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="8" style="text-align:center;color:#6B6475;padding:20px">Geen PA's gevonden voor "${escHtml(q)}"</td></tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:#6B6475;padding:20px">Geen PA's gevonden voor "${escHtml(q)}"</td></tr>`;
 };
 
 // Statuswijzigingen (inloggen, templates geladen) ook in de nieuwe schermen tonen
