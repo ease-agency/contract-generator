@@ -2125,58 +2125,92 @@ function contractVariabelen(key) {
 // [ALS]-blokken), inline: Map(index → [[van, tot]]) }.
 // Na een weggevallen blok verdwijnt ook een dubbele lege regel.
 function bepaalWeglatingen(alineas, vlaggen) {
+  // [ALS X] … [EINDE] mag op een eigen regel staan, aan het begin/eind van een alinea
+  // (ook met een zachte regelovergang ertussen), of binnen één zin.
   const weg = new Set();
   const inline = new Map();
   const blokken = [];
   const stack = [];
+  const ONZ = '[\\s\\u00a0\\u200B-\\u200D\\u2060\\uFEFF]*';
+  const BEGIN = '\\[\\s*ALS\\s+([^\\]]+?)\\s*\\]';
+  const EIND = '\\[\\s*(?:EINDE(?:\\s+ALS)?|\\/\\s*ALS)\\s*\\]';
+  const heelBegin = new RegExp('^' + ONZ + BEGIN + ONZ + '$', 'i');
+  const heelEind = new RegExp('^' + ONZ + EIND + ONZ + '$', 'i');
+  const beginVoor = new RegExp('^' + ONZ + BEGIN + ONZ, 'i');
+  const eindVoor = new RegExp('^' + ONZ + EIND + ONZ, 'i');
+  const beginNa = new RegExp(ONZ + BEGIN + ONZ + '$', 'i');
+  const eindNa = new RegExp(ONZ + EIND + ONZ + '$', 'i');
+  const paar = new RegExp(ALS_INLINE_BRON, 'i');
+  const inWeg = () => stack.some(s => !s.waar);
+  const knip = (i, van, tot) => { if (tot > van) { if (!inline.has(i)) inline.set(i, []); inline.get(i).push([van, tot]); } };
+  const leeg = (k, c) => k >= 0 && k < alineas.length && alineas[k].container === c && !alineas[k].tekst.replace(/[\s​-‍⁠﻿]/g, '');
+  const open = (i, expr, heel) => { const waar = evalVoorwaarde(expr, vlaggen); stack.push({ i, waar, heel }); return waar; };
+  // Sluit het laatst geopende blok. heel = de inhoud van deze alinea hoort nog bij het blok.
+  const sluit = (i, heel) => {
+    const o = stack.pop();
+    if (!o || o.waar || alineas[o.i].container !== alineas[i].container) return;
+    const van = o.heel ? o.i : o.i + 1, tot = heel ? i : i - 1;
+    for (let k = van; k <= tot; k++) { weg.add(k); inline.delete(k); }
+    if (van <= tot) {
+      blokken.push([van, tot]);
+      let voor = van - 1; while (voor >= 0 && weg.has(voor)) voor--;
+      if (leeg(voor, alineas[i].container) && leeg(tot + 1, alineas[i].container)) weg.add(tot + 1);
+    }
+  };
+
   alineas.forEach((a, i) => {
-    const t = a.tekst.trim();
-    const mb = t.match(ALS_BEGIN);
-    if (mb) { stack.push({ i, waar: evalVoorwaarde(mb[1], vlaggen) }); weg.add(i); return; }
-    if (ALS_EINDE.test(t)) {
-      const open = stack.pop();
-      weg.add(i);
-      if (open && !open.waar && alineas[open.i].container === a.container) {
-        for (let k = open.i; k <= i; k++) weg.add(k);
-        blokken.push([open.i, i]);
-        // Geen dubbele lege regel achterlaten
-        let voor = open.i - 1; while (voor >= 0 && weg.has(voor)) voor--;
-        const na = i + 1;
-        const leeg = k => k >= 0 && k < alineas.length && alineas[k].container === a.container && !alineas[k].tekst.trim();
-        if (leeg(voor) && leeg(na)) weg.add(na);
-      }
-      return;
+    const t = a.tekst;
+    let m;
+    if ((m = t.match(heelBegin))) { open(i, m[1], true); weg.add(i); return; }
+    if (heelEind.test(t)) { sluit(i, true); weg.add(i); return; }
+
+    let vanaf = 0, totEind = t.length;
+    // [EINDE] vooraan, tekst erachter: blok sluit vóór deze tekst
+    if ((m = t.match(eindVoor)) && !paar.test(t.slice(0, m[0].length))) {
+      sluit(i, false);
+      if (!inWeg()) knip(i, 0, m[0].length);
+      vanaf = m[0].length;
     }
-    const ranges = [];
-    const heelInline = new RegExp(ALS_INLINE_BRON, 'i').test(a.tekst);
-    const mStart = !heelInline && a.tekst.match(/^(\s*)(\[\s*ALS\s+([^\]]+?)\s*\]\s*)/i);
-    const mStop = !heelInline && a.tekst.match(/(\s*\[\s*(?:EINDE(?:\s+ALS)?|\/\s*ALS)\s*\])(\s*)$/i);
-    if (mStart) {
-      const waar = evalVoorwaarde(mStart[3], vlaggen);
-      stack.push({ i, waar });
-      if (stack.some(s => !s.waar)) return;
-      ranges.push([mStart[1].length, mStart[1].length + mStart[2].length]);
-    } else if (mStop) {
-      const open = stack.pop();
-      if (open && !open.waar && alineas[open.i].container === a.container) {
-        for (let k = open.i; k <= i; k++) weg.add(k);
-        blokken.push([open.i, i]);
-        return;
-      }
-      if (stack.some(s => !s.waar)) return;
-      ranges.push([mStop.index, mStop.index + mStop[1].length]);
-    } else if (stack.some(s => !s.waar)) return;   // binnen een weggevallen blok
-    for (const m of a.tekst.matchAll(new RegExp(ALS_INLINE_BRON, 'gi'))) {
-      const begin = m.index, eind = m.index + m[0].length;
-      if (evalVoorwaarde(m[2], vlaggen)) {
-        ranges.push([begin, begin + m[1].length]);
-        ranges.push([eind - m[4].length, eind]);
-      } else {
-        ranges.push([begin, eind]);
+    // [ALS] achteraan, tekst ervoor: blok begint na deze tekst
+    const restNa = t.slice(vanaf);
+    let beginAchter = null;
+    if ((m = restNa.match(beginNa)) && !new RegExp(EIND, 'i').test(restNa.slice(m.index))) {
+      beginAchter = { van: vanaf + m.index, expr: m[1] };
+      totEind = beginAchter.van;
+    }
+    const midden = t.slice(vanaf, totEind);
+    // [ALS] vooraan (zonder [EINDE] erachter in dezelfde alinea): blok begint hier, deze tekst hoort erbij
+    if ((m = midden.match(beginVoor)) && !paar.test(midden)) {
+      const buiten = inWeg();
+      const waar = open(i, m[1], true);
+      if (waar && !buiten) knip(i, vanaf, vanaf + m[0].length);
+      vanaf += m[0].length;
+    }
+    // [EINDE] achteraan, tekst ervoor: deze tekst hoort nog bij het blok
+    const midden2 = t.slice(vanaf, totEind);
+    let eindAchter = null;
+    if (beginAchter === null && (m = midden2.match(eindNa)) && !paar.test(midden2)) eindAchter = { van: vanaf + m.index, tot: vanaf + m.index + m[0].length };
+
+    if (!inWeg()) {
+      // [ALS …]tekst[EINDE] binnen de alinea
+      for (const mi of t.slice(vanaf, eindAchter ? eindAchter.van : totEind).matchAll(new RegExp(ALS_INLINE_BRON, 'gi'))) {
+        const begin = vanaf + mi.index, eind = begin + mi[0].length;
+        if (evalVoorwaarde(mi[2], vlaggen)) { knip(i, begin, begin + mi[1].length); knip(i, eind - mi[4].length, eind); }
+        else knip(i, begin, eind);
       }
     }
-    if (ranges.length) inline.set(i, ranges);
+    if (eindAchter) {
+      const o = stack[stack.length - 1];
+      const waar = !o || o.waar;
+      sluit(i, true);
+      if (waar && !inWeg()) knip(i, eindAchter.van, eindAchter.tot);
+    }
+    if (beginAchter) {
+      if (!inWeg()) knip(i, beginAchter.van, t.length);
+      open(i, beginAchter.expr, false);
+    }
   });
+  inline.forEach((r, i) => { if (weg.has(i)) inline.delete(i); });
   return { weg, inline, blokken };
 }
 
