@@ -742,10 +742,19 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
           <span class="err-msg" id="err-fr-einddatum">Vul een einddatum in</span>
         </div>
       </div>
+      <div id="fr-tarief-keuze" style="display:flex;gap:24px;margin-top:14px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;"><input type="radio" name="fr-tarief-soort" id="fr-tarief-een" value="een" checked> Eén uurtarief</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;"><input type="radio" name="fr-tarief-soort" id="fr-tarief-staffel" value="staffel"> Staffel</label>
+      </div>
       <div class="field" style="margin-top:12px;">
         <label for="fr-uurtarief">Uurtarief (excl. btw)</label>
         <div class="euro-wrap"><input type="number" id="fr-uurtarief" placeholder="0.00" min="0" step="0.01"></div>
         <span class="err-msg" id="err-fr-uurtarief">Vul een uurtarief in</span>
+      </div>
+      <div class="grid-3-gelijk" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:12px;">
+        <div class="field"><label for="fr-tarief-1">Staffel 1 · &lt; 32 uur p/m</label><div class="euro-wrap"><input type="number" id="fr-tarief-1" placeholder="0.00" min="0" step="0.01"></div><span class="err-msg" id="err-fr-tarief-1">Vul een tarief in</span></div>
+        <div class="field"><label for="fr-tarief-2">Staffel 2 · 32 t/m 64 uur</label><div class="euro-wrap"><input type="number" id="fr-tarief-2" placeholder="0.00" min="0" step="0.01"></div><span class="err-msg" id="err-fr-tarief-2">Vul een tarief in</span></div>
+        <div class="field"><label for="fr-tarief-3">Staffel 3 · &gt; 64 uur p/m</label><div class="euro-wrap"><input type="number" id="fr-tarief-3" placeholder="0.00" min="0" step="0.01"></div><span class="err-msg" id="err-fr-tarief-3">Vul een tarief in</span></div>
       </div>
     </div>
 
@@ -1159,6 +1168,9 @@ function zetAvVersie() {
 const FIELDS_FREELANCE = [
   { id: 'fr-naam',      testValue: 'Anna de Vries' },
   { id: 'fr-uurtarief', testValue: '40.00' },
+  { id: 'fr-tarief-1', testValue: '40.00' },
+  { id: 'fr-tarief-2', testValue: '37.50' },
+  { id: 'fr-tarief-3', testValue: '35.00' },
   { id: 'fr-postcode',  testValue: '1018 GV' },
   { id: 'fr-adres',     testValue: 'Sarphatistraat 72' },
   { id: 'fr-stad',      testValue: 'Amsterdam' },
@@ -1930,7 +1942,7 @@ const UITVOER_MAP_NAAM = 'Contracten (Contract Generator)';
 // Welke variabelen de tool per soort contract invult
 const VARIABELEN = {
   dienstverband: ['AANHEF', 'NAAM', 'GEBOORTEDATUM', 'ADRES', 'POSTCODE', 'WOONPLAATS', 'FUNCTIE', 'STARTDATUM', 'EINDDATUM', 'EINDDATUM_PLUS1', 'DUUR_MAANDEN', 'UURLOONDATUM', 'UURLOON', 'MIN_UREN', 'MAX_UREN', 'SALARISDATUM', 'SALARIS'],
-  freelance:     ['NAAM_PA', 'ADRES_PA', 'POSTCODE_PA', 'STAD_PA', 'STARTDATUM', 'EINDDATUM', 'UURTARIEF'],
+  freelance:     ['NAAM_PA', 'ADRES_PA', 'POSTCODE_PA', 'STAD_PA', 'STARTDATUM', 'EINDDATUM', 'UURTARIEF', 'UURTARIEF_1', 'UURTARIEF_2', 'UURTARIEF_3'],
   afsluit:       ['NAAM_PA', 'KLANTNAAM', 'DATUM_OVEREENKOMST', 'EINDDATUM'],
   addendum:      ['NAAM_PA', 'DATUM_OVK', 'INGANGSDATUM_OVK', 'OVK_TERM', 'DATUM_WIJZIGING', 'PERCENTAGE', 'UURLOON_OUD', 'UURLOON_NIEUW', 'UURLOON_KOP', 'VERLENG_START', 'VERLENG_EIND', 'VERLENG_MAANDEN', 'MIN_UREN', 'MAX_UREN'],
   klant:         ['BEDRIJFSNAAM', 'CONTACTPERSOON', 'KVK', 'ADRES', 'POSTCODE', 'WOONPLAATS', 'FUNCTIE', 'STARTDATUM', 'EINDDATUM', 'DUUR_MAANDEN', 'TARIFDATUM', 'AV_VERSIE'],
@@ -1985,13 +1997,14 @@ const VARIABELEN_ALGEMEEN = ['TEKENDATUM', 'VANDAAG', 'BESLUITDATUM'];
 const VLAGGEN = {
   addendum: ['UURLOON', 'VERLENGING', 'VASTLEGGING', 'AANPASSING'],
   afsluit:  ['DOORSTART'],
+  freelance: ['STAFFEL'],
 };
 
 // Alle contracten. naam = vaste documentnaam (bestaande namen worden ook herkend).
 const DOCS = {
   'pa-oproep':                    { naam: 'PA - Nuluren contract', label: 'Nuluren contract', vars: 'dienstverband', bestand: d => 'Nuluren overeenkomst ' + d.NAAM },
   'pa-minmax':                    { naam: 'PA - Min-max overeenkomst', label: 'Min-max overeenkomst', vars: 'dienstverband', bestand: d => 'MinMax overeenkomst ' + d.NAAM },
-  'pa-freelance':                 { naam: 'PA - Opdrachtovereenkomst ZZP', label: 'Opdrachtovereenkomst ZZP', vars: 'freelance', bestand: d => 'Opdrachtovereenkomst ' + d.NAAM_PA },
+  'pa-freelance':                 { naam: 'PA - Opdrachtovereenkomst ZZP', label: 'Opdrachtovereenkomst ZZP', vars: 'freelance', vlaggen: 'freelance', bestand: d => 'Opdrachtovereenkomst ' + d.NAAM_PA },
   'pa-addendum-minmax':           { naam: 'PA - Addendum min-max', label: 'Addendum min-max', vars: 'addendum', vlaggen: 'addendum', bestand: d => 'Addendum ' + d.NAAM_PA },
   'pa-addendum-oproep':           { naam: 'PA - Addendum nuluren', label: 'Addendum nuluren', vars: 'addendum', vlaggen: 'addendum', bestand: d => 'Addendum ' + d.NAAM_PA },
   'pa-afsluit':                   { naam: 'PA - Afsluitverklaring weg bij klant', label: 'Afsluitverklaring weg bij klant + blijft bij Ease', vars: 'afsluit', vlaggen: 'afsluit', bestand: d => 'Afsluitverklaring ' + d.NAAM_PA },
@@ -2085,6 +2098,7 @@ function contractVlaggen() {
   v.VASTLEGGING = chk('ad-type-vastlegging');
   v.AANPASSING = !v.VASTLEGGING;
   v.DOORSTART = v.OVERNAME = chk('af-toggle-doorstart');
+  v.STAFFEL = chk('fr-tarief-staffel');
   return v;
 }
 
@@ -2419,7 +2433,7 @@ function renderTekstenOverzicht() {
   const help = document.getElementById('teksten-uitleg-vars');
   if (help) help.innerHTML = `
     <p><b>PA nuluren / min-max:</b> ${varLijst('dienstverband')}</p>
-    <p><b>Opdrachtovereenkomst ZZP:</b> ${varLijst('freelance')}</p>
+    <p><b>Opdrachtovereenkomst ZZP:</b> ${varLijst('freelance')}<br>Voorwaarden: <code>[ALS STAFFEL]</code> en <code>[ALS NIET STAFFEL]</code> (keuze "Eén uurtarief / Staffel" in de tool)</p>
     <p><b>Addendum:</b> ${varLijst('addendum')}<br>Voorwaarden: ${VLAGGEN.addendum.map(v => `<code>[ALS ${v}]</code>`).join(' ')}</p>
     <p><b>Afsluitverklaring:</b> ${varLijst('afsluit')}<br>Voorwaarde (alleen "weg bij klant"): <code>[ALS DOORSTART]</code></p>
     <p><b>Klantcontracten:</b> ${varLijst('klant')}</p>`;
@@ -3354,6 +3368,9 @@ function getCurrentData() {
       STARTDATUM:  fmt(document.getElementById('fr-startdatum')?.value || ''),
       EINDDATUM:   fmt(document.getElementById('fr-einddatum')?.value || ''),
       UURTARIEF:   fmtE(document.getElementById('fr-uurtarief')?.value || ''),
+      UURTARIEF_1: fmtE(document.getElementById('fr-tarief-1')?.value || ''),
+      UURTARIEF_2: fmtE(document.getElementById('fr-tarief-2')?.value || ''),
+      UURTARIEF_3: fmtE(document.getElementById('fr-tarief-3')?.value || ''),
     };
   }
 
@@ -4198,7 +4215,7 @@ const VELD_VARS = {
   'uurloondatum': ['UURLOONDATUM'], 'uurloon': ['UURLOON'], 'min-uren': ['MIN_UREN'], 'max-uren': ['MAX_UREN'],
   'salarisdatum': ['SALARISDATUM'], 'salaris': ['SALARIS'],
   'fr-naam': ['NAAM_PA'], 'fr-postcode': ['POSTCODE_PA'], 'fr-adres': ['ADRES_PA'], 'fr-stad': ['STAD_PA'],
-  'fr-startdatum': ['STARTDATUM'], 'fr-einddatum': ['EINDDATUM'], 'fr-uurtarief': ['UURTARIEF'],
+  'fr-startdatum': ['STARTDATUM'], 'fr-einddatum': ['EINDDATUM'], 'fr-uurtarief': ['UURTARIEF'], 'fr-tarief-1': ['UURTARIEF_1'], 'fr-tarief-2': ['UURTARIEF_2'], 'fr-tarief-3': ['UURTARIEF_3'],
   'af-naam-pa': ['NAAM_PA'], 'af-naam-klant': ['KLANTNAAM'], 'af-datum-overeenkomst': ['DATUM_OVEREENKOMST'], 'af-einddatum': ['EINDDATUM'],
   'ad-naam-pa': ['NAAM_PA'], 'ad-datum-ovk': ['DATUM_OVK'], 'ad-ingangsdatum-ovk': ['INGANGSDATUM_OVK', 'VERLENG_START', 'VERLENG_EIND'],
   'ad-datum-wijziging': ['DATUM_WIJZIGING'], 'ad-percentage': ['PERCENTAGE'], 'ad-uurloon-oud': ['UURLOON_OUD'],
@@ -4230,9 +4247,18 @@ function templateInfo(key) {
   return (_templateInfo[key] = { html, gebruikt, onbekend: [...onbekend], vlaggen });
 }
 
+// Gebruikt het template de keuze [ALS STAFFEL]?
+function heeftStaffel() {
+  const html = driveHtml['pa-freelance'];
+  return !!html && /\[\s*ALS\s+[^\]]*STAFFEL/i.test(htmlNaarTekst(html).join('\n'));
+}
 function veldGebruikt(id) {
   const vars = VELD_VARS[id];
   if (!vars) return true;
+  if (id === 'fr-uurtarief' || id.startsWith('fr-tarief-')) {
+    const staffel = heeftStaffel() && !!document.getElementById('fr-tarief-staffel')?.checked;
+    if (id === 'fr-uurtarief' ? staffel : !staffel) return false;
+  }
   const key = driveCurrentKey();
   const info = key && templateInfo(key);
   if (!info || !info.gebruikt.size) return id !== 'besluitdatum';
@@ -4265,6 +4291,8 @@ function pasVeldenAan() {
     const fd = document.getElementById('field-af-doorstart');
     if (fd) fd.hidden = !(key === 'pa-afsluit' && (!vl || vl.has('DOORSTART') || vl.has('OVERNAME')));
   }
+  const keuze = document.getElementById('fr-tarief-keuze');
+  if (keuze) keuze.classList.toggle('veld-weg', !heeftStaffel());
   const uren = document.getElementById('ad-section-uren');
   if (uren) uren.classList.toggle('veld-weg', !veldGebruikt('ad-min-uren') && !veldGebruikt('ad-max-uren'));
   if (document.getElementById('view-generator')?.offsetParent === null) return;
