@@ -2153,8 +2153,12 @@ function bepaalWeglatingen(alineas, vlaggen) {
     for (let k = van; k <= tot; k++) { weg.add(k); inline.delete(k); }
     if (van <= tot) {
       blokken.push([van, tot]);
-      let voor = van - 1; while (voor >= 0 && weg.has(voor)) voor--;
-      if (leeg(voor, alineas[i].container) && leeg(tot + 1, alineas[i].container)) weg.add(tot + 1);
+      // Lege regels rond het weggevallen blok opruimen
+      const c = alineas[i].container;
+      let voor = van - 1; const leegVoor = [];
+      while (voor >= 0 && (weg.has(voor) || leeg(voor, c))) { if (!weg.has(voor)) leegVoor.push(voor); voor--; }
+      const leegNa = []; for (let k = tot + 1; leeg(k, c) && !weg.has(k); k++) leegNa.push(k);
+      if (leegVoor.length || voor < 0) leegNa.forEach(k => weg.add(k)); // geen dubbele lege regels
     }
   };
 
@@ -2210,6 +2214,15 @@ function bepaalWeglatingen(alineas, vlaggen) {
       open(i, beginAchter.expr, false);
     }
   });
+  // Titel (bijv. "ARTIKEL 6 …") waarna [ALS]-regels zijn weggevallen: lege regels tot de tekst ook weg
+  const isKop = k => { const v = alineas[k].tekst.replace(/[\s\u200B-\u200D\u2060\uFEFF]+/g, ' ').trim(); return !!v && v.length <= 100 && (/^(artikel|article)\b/i.test(v) || (v === v.toUpperCase() && /[A-Z]/.test(v))); };
+  for (let h = 0; h < alineas.length; h++) {
+    if (weg.has(h) || !isKop(h)) continue;
+    const c = alineas[h].container, legen = [];
+    let k = h + 1, ertussen = false;
+    while (k < alineas.length && alineas[k].container === c && (weg.has(k) || leeg(k, c))) { if (weg.has(k)) ertussen = true; else legen.push(k); k++; }
+    if (ertussen) legen.forEach(x => weg.add(x));
+  }
   inline.forEach((r, i) => { if (weg.has(i)) inline.delete(i); });
   return { weg, inline, blokken };
 }
@@ -3581,6 +3594,16 @@ function vulTemplateHtml(html, key, data, vlaggen) {
     [...ranges].sort((a, b) => b[0] - a[0]).forEach(([a, b]) => vervangBereik(nodes, a, b, ''));
   });
   teVerwijderen.forEach(el => el.remove());
+  r.inline.forEach((_, i) => {
+    const el = alineas[i].el;
+    if (!el.isConnected) return;
+    const leegTekst = rg => !rg.toString().replace(/[\s ​-‍⁠﻿]/g, '');
+    [...el.querySelectorAll('br')].forEach(br => {
+      const voor = doc.createRange(); voor.setStart(el, 0); voor.setEndBefore(br);
+      const na = doc.createRange(); na.setStartAfter(br); na.setEnd(el, el.childNodes.length);
+      if (leegTekst(voor) || leegTekst(na)) br.remove();
+    });
+  });
 
   // Variabelen invullen
   const bekend = new Set(contractVariabelen(key));
@@ -4309,6 +4332,7 @@ function veldGebruikt(id) {
   if (id === 'fr-uurtarief' || id.startsWith('fr-tarief-')) {
     const staffel = heeftStaffel() && !!document.getElementById('fr-tarief-staffel')?.checked;
     if (id === 'fr-uurtarief' ? staffel : !staffel) return false;
+    if (id !== 'fr-uurtarief') return true;
   }
   const key = driveCurrentKey();
   const info = key && templateInfo(key);
