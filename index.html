@@ -330,6 +330,20 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
 
 .pa-kaart-sub { display: flex; flex-direction: column; gap: 1px; }
 
+/* Templates nalopen */
+.controle-balk { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: #fff; border: 2px solid var(--purple); border-radius: 14px; padding: 12px 16px; margin-bottom: 18px; box-shadow: 0 4px 14px rgba(56,35,89,0.12); }
+.cb-links { display: flex; flex-direction: column; gap: 2px; min-width: 200px; }
+.cb-titel { font-weight: 700; color: var(--purple); font-size: 16px; }
+.cb-sub { font-size: 13px; color: var(--muted); }
+.cb-knoppen { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cb-knoppen select { width: auto; max-width: 280px; }
+.verborgen-label { position: absolute; left: -9999px; }
+body.controle #view-nieuw .pagina-kop, body.controle .doc-kop, body.controle .split-left .actions,
+body.controle #btn-definitief, body.controle #btn-aanpassen { display: none !important; }
+
+/* Als een veld in een rij wegvalt, neemt het andere veld de hele breedte */
+.grid-2:has(> .veld-weg), .grid-3:has(> .veld-weg), .grid-1-2:has(> .veld-weg) { grid-template-columns: 1fr; }
+
 </style>
 </head>
 <body>
@@ -358,6 +372,20 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
 
   <!-- ══ NIEUW CONTRACT ══ -->
   <div id="view-nieuw">
+    <div id="controle-balk" class="controle-balk" hidden>
+      <div class="cb-links">
+        <span class="cb-titel">Templates nalopen</span>
+        <span class="cb-sub">met voorbeeldgegevens · <span id="cb-teller"></span> · <span id="cb-status"></span></span>
+      </div>
+      <div class="cb-knoppen">
+        <label for="cb-kies" class="verborgen-label">Template</label>
+        <select id="cb-kies" onchange="controleToon(parseInt(this.value, 10))"></select>
+        <button type="button" class="btn btn-secondary" onclick="controleToon(CONTROLE.i - 1)" aria-label="Vorige template">← Vorige</button>
+        <button type="button" class="btn btn-primary" onclick="controleToon(CONTROLE.i + 1)" aria-label="Volgende template">Volgende →</button>
+        <a id="cb-open" class="btn btn-secondary" style="text-decoration:none" href="#" target="_blank" rel="noopener">Openen in Google Docs ↗</a>
+        <button type="button" class="btn btn-secondary" onclick="controleStop()">Stoppen</button>
+      </div>
+    </div>
     <div class="pagina-kop">
       <div>
         <button type="button" id="terug-knop" class="terug-knop" onclick="stapTerug()" hidden><span aria-hidden="true">←</span> Terug</button>
@@ -396,7 +424,7 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
       <div id="doc-wie" class="wie-balk"></div>
       <div id="doc-aanbevolen"></div>
       <div id="doc-groepen"></div>
-      <p class="paneel-voet">Elk template uit de Drive-map staat hier als kaart. Staat een template op oranje of rood, kijk dan bij Instellingen wat er mis is.</p>
+      <p class="paneel-voet">Elk template uit de Drive-map staat hier als kaart. Staat een template op oranje of rood, kijk dan bij Instellingen wat er mis is. <button type="button" class="link-knop" onclick="controleStart(0)">Alle templates nalopen</button></p>
     </section>
 
     <section id="stap-klaar" class="stap-paneel" hidden>
@@ -1105,6 +1133,7 @@ input[type="text"], input[type="date"], input[type="number"], select, #wie-zoek 
     <div class="card">
       <div class="card-title">Templates in Google Drive</div>
       <p style="font-size:13px;color:#555;margin-bottom:12px;">Elk contract wordt gemaakt als kopie van een Google Doc-template uit de Drive-map, in precies die opmaak. Pas een template aan in Google Docs en klik daarna op "Opnieuw ophalen". De gemaakte contracten komen in de map "Contracten (Contract Generator)" in je eigen Google Drive; daar kun je een contract nog aanpassen en opnieuw als PDF downloaden.</p>
+      <div style="margin-bottom:14px"><button type="button" class="btn btn-primary" onclick="controleStart(0)">Alle templates nalopen</button> <span style="font-size:13px;color:#6B6475;margin-left:6px">Bekijk elk template met voorbeeldgegevens, met Vorige en Volgende.</span></div>
       <div id="teksten-overzicht"></div>
     </div>
     <div class="card teksten-uitleg">
@@ -4757,6 +4786,63 @@ renderTekstBron = function () {
 };
 const _renderSyncCard = renderSyncCard;
 renderSyncCard = function () { _renderSyncCard.apply(this, arguments); try { renderNav(); } catch (e) {} };
+
+
+// ── Alle templates nalopen ─────────────────────────
+const CONTROLE = { aan: false, i: 0 };
+function controleStart(i) {
+  CONTROLE.aan = true;
+  document.body.classList.add('controle');
+  const sel = document.getElementById('cb-kies');
+  sel.innerHTML = DRIVE_MANAGED.map((k, n) => `<option value="${n}">${n + 1}. ${escHtml(DOC_KAART[k].naam)}</option>`).join('');
+  document.getElementById('controle-balk').hidden = false;
+  controleToon(i || 0);
+}
+function controleToon(i) {
+  const keys = DRIVE_MANAGED;
+  CONTROLE.i = (i + keys.length) % keys.length;
+  const key = keys[CONTROLE.i];
+  const stil = showToast;
+  showToast = () => {};
+  try {
+    leegFormulier();
+    UI.voor = key.startsWith('klant-') ? 'klant' : 'pa';
+    if (UI.view !== 'nieuw' || document.getElementById('view-nieuw').classList.contains('hidden')) { UI.stap = 3; ga('nieuw'); }
+    kiesDocument(key);
+    fillTestData();
+    const bd = document.getElementById('besluitdatum');
+    if (bd && !bd.value) bd.value = new Date().toISOString().slice(0, 10);
+    renderPreviewPanel();
+  } finally { showToast = stil; }
+  document.getElementById('cb-kies').value = String(CONTROLE.i);
+  document.getElementById('cb-teller').textContent = `${CONTROLE.i + 1} van ${keys.length}`;
+  const st = docStatus(key);
+  const s = document.getElementById('cb-status');
+  s.textContent = st.tekst; s.className = 'doc-status ' + st.cls;
+  const a = document.getElementById('cb-open');
+  if (driveDocIds[key]) { a.href = `https://docs.google.com/document/d/${driveDocIds[key]}/edit`; a.hidden = false; } else a.hidden = true;
+}
+function controleStop(naarStart = true) {
+  if (!CONTROLE.aan) return;
+  CONTROLE.aan = false;
+  document.body.classList.remove('controle');
+  document.getElementById('controle-balk').hidden = true;
+  leegFormulier();
+  UI.doc = null;
+  if (naarStart) naarStap(1);
+}
+// Pijltjestoetsen tijdens het nalopen
+document.addEventListener('keydown', e => {
+  if (!CONTROLE.aan || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); controleToon(CONTROLE.i + 1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); controleToon(CONTROLE.i - 1); }
+});
+// Naar een ander scherm (of een andere stap) = nalopen stoppen
+const _gaVoorControle = ga;
+ga = function (view) { if (CONTROLE.aan && view !== 'nieuw') controleStop(false); return _gaVoorControle.apply(this, arguments); };
+const _naarStapVoorControle = naarStap;
+naarStap = function (n) { if (CONTROLE.aan && n !== 3) controleStop(false); return _naarStapVoorControle.apply(this, arguments); };
 
 // ── Live preview: update terwijl gebruiker typt ──
 (function() {
