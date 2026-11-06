@@ -2275,12 +2275,10 @@ function driveControleer(key, naam, html) {
   const alles = regels.join('\n');
   let open = 0, scheef = false;
   const gebruikteVlaggen = new Set();
-  regels.forEach(t => {
-    const m = t.match(ALS_BEGIN);
-    if (m) { open++; voorwaardeNamen(m[1]).forEach(v => gebruikteVlaggen.add(v)); }
-    else if (ALS_EINDE.test(t)) { open--; if (open < 0) scheef = true; }
-    for (const mi of t.matchAll(new RegExp(ALS_INLINE_BRON, 'gi'))) voorwaardeNamen(mi[2]).forEach(v => gebruikteVlaggen.add(v));
-  });
+  for (const mi of alles.matchAll(/\[\s*ALS\s+([^\]]+?)\s*\]|\[\s*(?:EINDE(?:\s+ALS)?|\/\s*ALS)\s*\]/gi)) {
+    if (mi[1] !== undefined) { open++; voorwaardeNamen(mi[1]).forEach(v => gebruikteVlaggen.add(v)); }
+    else { open--; if (open < 0) scheef = true; }
+  }
   if (open !== 0 || scheef) meldingen.push(`${naam}: niet elke [ALS ...] heeft een bijbehorende [EINDE]`);
   const toegestaan = new Set([...(VLAGGEN[cfg.vlaggen] || []), 'VERLENG', 'OVERNAME']);
   const onbekendeVlag = [...gebruikteVlaggen].filter(v => !toegestaan.has(v));
