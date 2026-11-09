@@ -4979,6 +4979,10 @@ function docsRegelhoogte(d, w) {
   const natuurlijk = (familie, gewicht, stijl) => {
     const k = familie + '|' + gewicht + '|' + stijl;
     if (cache[k]) return cache[k];
+    // Regelhoogte die Google Docs per lettertype gebruikt (gemeten in PDF's van Google), anders meten
+    const eerste = String(familie).split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
+    const DOCS_HOOGTE = { 'lato': 1.2, 'arial': 1.149, 'arimo': 1.149, 'times new roman': 1.15, 'tinos': 1.15, 'georgia': 1.136, 'gelasio': 1.136, 'montserrat': 1.219, 'playfair display': 1.333, 'calibri': 1.22, 'carlito': 1.22, 'courier new': 1.133, 'cousine': 1.133 };
+    if (DOCS_HOOGTE[eerste]) return (cache[k] = DOCS_HOOGTE[eerste]);
     const t = d.createElement('div');
     t.style.cssText = `position:absolute;visibility:hidden;left:-9999px;top:0;font-family:${familie};font-weight:${gewicht};font-style:${stijl};font-size:100px;line-height:normal;white-space:nowrap;padding:0;margin:0;border:0`;
     t.textContent = 'Hg';
@@ -4992,12 +4996,30 @@ function docsRegelhoogte(d, w) {
     const lh = parseFloat(cs.lineHeight), fs = parseFloat(cs.fontSize);
     if (!lh || !fs || cs.lineHeight === 'normal') return;
     const m = lh / fs;
-    // lettertype van de eerste tekst in de alinea
-    let bron = el;
+    // Hoogste natuurlijke regelhoogte van de tekst in de alinea (zoals Google Docs per regel doet)
+    let hoogste = 0, bron = null;
     const tw = d.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let n; while ((n = tw.nextNode())) if (n.nodeValue.trim()) { bron = n.parentElement; break; }
-    const bs = w.getComputedStyle(bron);
-    el.style.lineHeight = String(Math.round(m * natuurlijk(bs.fontFamily, bs.fontWeight, bs.fontStyle) * 1000) / 1000);
+    let n;
+    while ((n = tw.nextNode())) {
+      if (!n.nodeValue.replace(/[\s\u00a0]/g, '')) continue;
+      const bs = w.getComputedStyle(n.parentElement);
+      const h = natuurlijk(bs.fontFamily, bs.fontWeight, bs.fontStyle) * parseFloat(bs.fontSize);
+      if (h > hoogste) { hoogste = h; bron = bs; }
+    }
+    const leeg = !hoogste;
+    if (leeg) {
+      if (el.querySelector('img, table')) return;
+      // Lege regel: hoogte volgt het lettertype van de (lege) tekst erin
+      const sp = el.querySelector('span') || el;
+      const bs = w.getComputedStyle(sp);
+      hoogste = natuurlijk(bs.fontFamily, bs.fontWeight, bs.fontStyle) * parseFloat(bs.fontSize);
+      bron = bs;
+    }
+    // Lettertype van de alinea zelf gelijk aan de tekst, anders maakt de browser de regel hoger dan nodig
+    if (bron) { el.style.fontFamily = bron.fontFamily; el.style.fontSize = bron.fontSize; }
+    const px = Math.round(m * hoogste * 100) / 100;
+    el.style.lineHeight = px + 'px';
+    if (leeg) { el.style.setProperty('height', px + 'px', 'important'); el.style.setProperty('min-height', px + 'px', 'important'); }
   });
 }
 
