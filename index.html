@@ -344,6 +344,13 @@ body.controle #btn-definitief, body.controle #btn-aanpassen { display: none !imp
 /* Als een veld in een rij wegvalt, neemt het andere veld de hele breedte */
 .grid-2:has(> .veld-weg), .grid-3:has(> .veld-weg), .grid-1-2:has(> .veld-weg) { grid-template-columns: 1fr; }
 
+.zoom-knoppen { display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--veld-rand); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+.zoom-knoppen button { min-width: 36px; height: 36px; padding: 0 8px; border: 0; background: transparent; color: var(--purple); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.zoom-knoppen button + button { border-left: 1px solid var(--rand); }
+.zoom-knoppen button:hover { background: var(--purple-light); }
+.zoom-knoppen button.actief { background: var(--purple); color: #fff; }
+#zoom-waarde { min-width: 56px; }
+
 </style>
 </head>
 <body>
@@ -961,6 +968,12 @@ body.controle #btn-definitief, body.controle #btn-aanpassen { display: none !imp
     <div class="split-right">
       <div class="live-preview-header">
         <div class="live-preview-title">Voorbeeld&#8201;—&#8201;<span id="preview-contract-naam" style="font-weight:400"></span></div>
+        <div class="zoom-knoppen" role="group" aria-label="Zoom voorbeeld">
+          <button type="button" onclick="zoomStap(-1)" aria-label="Uitzoomen">−</button>
+          <button type="button" id="zoom-waarde" onclick="zoomZet(1)" title="Terug naar 100%">100%</button>
+          <button type="button" onclick="zoomStap(1)" aria-label="Inzoomen">+</button>
+          <button type="button" id="zoom-passend" onclick="zoomZet('passend')">Passend</button>
+        </div>
         <button class="btn btn-secondary" id="btn-aanpassen" onclick="maakEnPasAan()" title="Zet het ingevulde contract klaar in Google Docs om eerst nog iets aan te passen" style="font-size:12px;padding:0 14px;flex-shrink:0;">Eerst aanpassen in Google Docs</button>
         <button class="btn btn-primary" id="btn-definitief" onclick="generatePDFFromPreview()" style="font-size:12px;padding:0 14px;flex-shrink:0;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -3799,19 +3812,7 @@ function renderPreviewPanel() {
       try { kleurIngevuld(d, w); } catch (e) {}
       try { pagineerVoorbeeld(d, w); } catch (e) { console.warn('Pagina-indeling voorbeeld mislukt', e); }
       try {
-        // Pagina verkleinen als hij breder is dan het voorbeeldvenster
-        const pagina = d.querySelector('.ct-pagina') || d.body;
-        const breed = pagina.getBoundingClientRect().width + 32;
-        const schaal = frame.clientWidth ? Math.min(1, frame.clientWidth / breed) : 1;
-        if (schaal < 1) {
-          const b = d.body;
-          const hoog = b.getBoundingClientRect().height;
-          b.style.setProperty('width', breed + 'px', 'important');
-          b.style.transformOrigin = '0 0';
-          b.style.transform = 'scale(' + schaal + ')';
-          b.style.setProperty('margin', '0 0 ' + (-(1 - schaal) * hoog) + 'px ' + Math.max(0, (frame.clientWidth - breed * schaal) / 2) + 'px', 'important');
-          d.documentElement.style.overflowX = 'hidden';
-        }
+        pasZoomToe(frame);
         w.scrollTo(0, scroll);
       } catch (e) {}
     };
@@ -4902,6 +4903,55 @@ function uiHerstel() {
     }, 300);
   } else verder();
 }
+
+
+// ── Zoom van het voorbeeld ─────────────────────────
+const ZOOM_STAPPEN = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 2];
+let voorbeeldZoom = (() => { try { const v = localStorage.getItem('ease_zoom'); return v === 'passend' ? 'passend' : (parseFloat(v) || 1); } catch (e) { return 1; } })();
+function pasZoomToe(frame) {
+  frame = frame || document.querySelector('iframe.preview-frame');
+  if (!frame) return;
+  let d;
+  try { d = frame.contentDocument; } catch (e) { return; }
+  if (!d || !d.body) return;
+  const b = d.body;
+  const pagina = d.querySelector('.ct-pagina') || b;
+  const breed = pagina.offsetWidth + 32;
+  const beschikbaar = frame.clientWidth || breed;
+  const schaal = voorbeeldZoom === 'passend' ? Math.min(1, beschikbaar / breed) : voorbeeldZoom;
+  const hoog = b.offsetHeight;
+  b.style.setProperty('width', breed + 'px', 'important');
+  b.style.transformOrigin = '0 0';
+  b.style.transform = schaal === 1 ? '' : 'scale(' + schaal + ')';
+  b.style.setProperty('margin', '0 0 ' + ((schaal - 1) * hoog) + 'px ' + Math.max(0, (beschikbaar - breed * schaal) / 2) + 'px', 'important');
+  d.documentElement.style.overflowX = breed * schaal > beschikbaar + 1 ? 'auto' : 'hidden';
+  zoomKnoppen(schaal);
+}
+function zoomKnoppen(schaal) {
+  const w = document.getElementById('zoom-waarde');
+  if (w) w.textContent = Math.round(schaal * 100) + '%';
+  const p = document.getElementById('zoom-passend');
+  if (p) p.classList.toggle('actief', voorbeeldZoom === 'passend');
+}
+function zoomZet(z) {
+  const frame = document.querySelector('iframe.preview-frame');
+  let verh = 0;
+  try { const w = frame.contentWindow, d = frame.contentDocument; verh = w.scrollY / Math.max(1, d.documentElement.scrollHeight); } catch (e) {}
+  voorbeeldZoom = z;
+  try { localStorage.setItem('ease_zoom', String(z)); } catch (e) {}
+  pasZoomToe(frame);
+  try { const w = frame.contentWindow, d = frame.contentDocument; w.scrollTo(w.scrollX, verh * d.documentElement.scrollHeight); } catch (e) {}
+}
+function zoomStap(r) {
+  let nu = voorbeeldZoom;
+  if (nu === 'passend') { const t = document.getElementById('zoom-waarde'); nu = (parseInt(t && t.textContent, 10) || 100) / 100; }
+  let i = ZOOM_STAPPEN.findIndex(z => z >= nu - 0.001);
+  if (i < 0) i = ZOOM_STAPPEN.length - 1;
+  if (r > 0 && ZOOM_STAPPEN[i] <= nu + 0.001) i++;
+  if (r < 0) i--;
+  zoomZet(ZOOM_STAPPEN[Math.max(0, Math.min(ZOOM_STAPPEN.length - 1, i))]);
+}
+window.addEventListener('resize', () => { if (voorbeeldZoom === 'passend') pasZoomToe(); });
 
 // ── Live preview: update terwijl gebruiker typt ──
 (function() {
