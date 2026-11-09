@@ -1161,6 +1161,19 @@ body.controle #btn-definitief, body.controle #btn-aanpassen { display: none !imp
   <div id="view-editor" class="hidden">
     <div class="pagina-kop"><h1 class="paginatitel">Instellingen</h1></div>
     <div class="card" id="gs-sync-card" style="margin-bottom:1rem;"><!-- rendered by renderSyncCard() --></div>
+    <div class="card" id="collega-kaart" style="margin-bottom:1rem;">
+      <div class="card-title">Collega toegang geven</div>
+      <p style="font-size:14px;color:#5E5768;line-height:1.6;margin-bottom:12px;">Stuur een collega deze link. Opent ze hem één keer, dan staan de instellingen (Client ID, Sheet en Drive-map) bij haar goed en hoeft ze alleen nog in te loggen met haar eigen Google-account. Er staan geen PA-gegevens in de link.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button type="button" class="btn btn-primary" onclick="kopieerCollegaLink()">Link voor collega kopiëren</button>
+        <input type="text" id="collega-link" readonly hidden aria-label="Link voor collega" style="flex:1 1 280px;min-width:0;" onfocus="this.select()">
+      </div>
+      <ul style="font-size:13px;color:#5E5768;line-height:1.6;margin:12px 0 0 18px;">
+        <li>Deel de Sheet en de Drive-map met haar Google-account (of met jullie organisatie), en zet delen op <b>Beperkt</b>, niet op "Iedereen met de link".</li>
+        <li>Staat het OAuth-toestemmingsscherm in Google Cloud op "Extern" in testmodus? Voeg haar dan toe als testgebruiker.</li>
+        <li>Stuur de link alleen intern, bijvoorbeeld via mail of chat.</li>
+      </ul>
+    </div>
     <div class="card">
       <div class="card-title">Templates in Google Drive</div>
       <p style="font-size:13px;color:#555;margin-bottom:12px;">Elk contract wordt gemaakt als kopie van een Google Doc-template uit de Drive-map, in precies die opmaak. Pas een template aan in Google Docs en klik daarna op "Opnieuw ophalen". De gemaakte contracten komen in de map "Contracten (Contract Generator)" in je eigen Google Drive; daar kun je een contract nog aanpassen en opnieuw als PDF downloaden.</p>
@@ -5078,6 +5091,40 @@ async function exactePdf() {
 // Pas je iets aan of kies je een ander document, dan weer het snelle voorbeeld
 const _schedVoorPdf = scheduleLivePreview;
 scheduleLivePreview = function () { if (!_pdfBezig) sluitExactePdf(); return _schedVoorPdf.apply(this, arguments); };
+
+
+// ── Instellingenlink voor collega's ────────────────
+// Alleen Client ID, Sheet-ID, tabbladnaam en map-ID; in het #-deel van de link, dus niet naar een server
+function collegaLink() {
+  const c = gsGetConfig() || {};
+  const data = { c: c.clientId || '', s: c.sheetId || '', t: c.tabName || '', f: c.folderId || '' };
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(data)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return location.origin + location.pathname + '#instellingen=' + b64;
+}
+async function kopieerCollegaLink() {
+  const c = gsGetConfig() || {};
+  if (!c.clientId || !c.sheetId || !c.folderId) { showToast('Vul eerst zelf de instellingen in (Client ID, Sheet en Drive-map).', true); return; }
+  const link = collegaLink();
+  const veld = document.getElementById('collega-link');
+  veld.value = link; veld.hidden = false;
+  try { await navigator.clipboard.writeText(link); showToast('Link gekopieerd. Plak hem in een bericht aan je collega.'); }
+  catch (e) { veld.focus(); veld.select(); showToast('Kopieer de link hieronder (Ctrl+C).'); }
+}
+(function instellingenUitLink() {
+  const m = location.hash.match(/^#instellingen=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
+  let d;
+  try { d = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/'))))); } catch (e) { showToast('Deze instellingenlink is niet geldig.', true); return; }
+  const veilig = v => typeof v === 'string' && v.length < 300 && /^[A-Za-z0-9._\- ]*$/.test(v);
+  const tabVeilig = v => typeof v === 'string' && v.length < 200 && !/[<>"`\\]/.test(v);
+  if (!d || ![d.c, d.s, d.f].every(veilig) || !tabVeilig(d.t) || !d.c || !d.s || !d.f) { showToast('Deze instellingenlink is niet geldig.', true); return; }
+  const huidig = gsGetConfig() || {};
+  const anders = huidig.clientId && (huidig.clientId !== d.c || huidig.sheetId !== d.s || huidig.folderId !== d.f);
+  if (anders && !window.confirm('Deze link bevat andere instellingen dan nu in deze browser staan. Overnemen?')) return;
+  gsZetConfig({ clientId: d.c, sheetId: d.s, tabName: d.t, folderId: d.f });
+  setTimeout(() => showToast('Instellingen overgenomen. Log nu in met Google.'), 300);
+})();
 
 // ── Live preview: update terwijl gebruiker typt ──
 (function() {
