@@ -351,6 +351,19 @@ body.controle #btn-definitief, body.controle #btn-aanpassen { display: none !imp
 .zoom-knoppen button.actief { background: var(--purple); color: #fff; }
 #zoom-waarde { min-width: 56px; }
 
+.pdf-weergave { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #DADCE0; border-radius: 0 0 16px 16px; overflow: hidden; }
+.pdf-balk { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 16px; background: #fff; border-top: 1px solid var(--rand); border-bottom: 1px solid var(--rand); font-size: 13px; color: var(--ink); }
+#pdf-info { font-weight: 700; }
+.pdf-inhoud { flex: 1; min-height: 0; display: flex; }
+.pdf-inhoud iframe { flex: 1; border: 0; width: 100%; height: 100%; background: #525659; }
+.pdf-wacht { margin: auto; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.6; padding: 2rem; }
+.pdf-wacht.fout { color: #7A1C14; }
+
+.live-preview-header { gap: 8px; }
+.live-preview-title { flex: 1 1 100%; }
+#btn-aanpassen { margin-left: auto; }
+#btn-exact, #btn-aanpassen, #btn-definitief { height: 36px; }
+
 </style>
 </head>
 <body>
@@ -968,17 +981,22 @@ body.controle #btn-definitief, body.controle #btn-aanpassen { display: none !imp
     <div class="split-right">
       <div class="live-preview-header">
         <div class="live-preview-title">Voorbeeld&#8201;—&#8201;<span id="preview-contract-naam" style="font-weight:400"></span></div>
+        <button type="button" class="btn btn-secondary" id="btn-exact" onclick="exactePdf()" title="Laat Google het ingevulde contract als echte PDF maken en bekijk die hier (duurt een paar seconden)" style="font-size:12px;padding:0 12px;flex-shrink:0;">Exacte PDF</button>
         <div class="zoom-knoppen" role="group" aria-label="Zoom voorbeeld">
           <button type="button" onclick="zoomStap(-1)" aria-label="Uitzoomen">−</button>
           <button type="button" id="zoom-waarde" onclick="zoomZet(1)" title="Terug naar 100%">100%</button>
           <button type="button" onclick="zoomStap(1)" aria-label="Inzoomen">+</button>
           <button type="button" id="zoom-passend" onclick="zoomZet('passend')">Passend</button>
         </div>
-        <button class="btn btn-secondary" id="btn-aanpassen" onclick="maakEnPasAan()" title="Zet het ingevulde contract klaar in Google Docs om eerst nog iets aan te passen" style="font-size:12px;padding:0 14px;flex-shrink:0;">Eerst aanpassen in Google Docs</button>
+        <button class="btn btn-secondary" id="btn-aanpassen" onclick="maakEnPasAan()" title="Zet het ingevulde contract klaar in Google Docs om eerst nog iets aan te passen" style="font-size:12px;padding:0 14px;flex-shrink:0;">Eerst aanpassen</button>
         <button class="btn btn-primary" id="btn-definitief" onclick="generatePDFFromPreview()" style="font-size:12px;padding:0 14px;flex-shrink:0;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           PDF maken
         </button>
+      </div>
+      <div id="pdf-weergave" class="pdf-weergave" hidden>
+        <div class="pdf-balk"><span id="pdf-info">Exacte PDF van Google</span><button type="button" class="link-knop" onclick="sluitExactePdf()">Terug naar snel voorbeeld</button></div>
+        <div id="pdf-inhoud" class="pdf-inhoud"></div>
       </div>
       <div id="preview-body" class="preview-body">
         <div class="preview-placeholder">
@@ -3810,6 +3828,7 @@ function renderPreviewPanel() {
     } catch (e) { return; }
     const afronden = () => {
       try { kleurIngevuld(d, w); } catch (e) {}
+      try { docsRegelhoogte(d, w); } catch (e) { console.warn('Regelhoogte voorbeeld', e); }
       try { pagineerVoorbeeld(d, w); } catch (e) { console.warn('Pagina-indeling voorbeeld mislukt', e); }
       try {
         pasZoomToe(frame);
@@ -4952,6 +4971,91 @@ function zoomStap(r) {
   zoomZet(ZOOM_STAPPEN[Math.max(0, Math.min(ZOOM_STAPPEN.length - 1, i))]);
 }
 window.addEventListener('resize', () => { if (voorbeeldZoom === 'passend') pasZoomToe(); });
+
+
+// ── Regelhoogte zoals in Google Docs ───────────────
+function docsRegelhoogte(d, w) {
+  const cache = {};
+  const natuurlijk = (familie, gewicht, stijl) => {
+    const k = familie + '|' + gewicht + '|' + stijl;
+    if (cache[k]) return cache[k];
+    const t = d.createElement('div');
+    t.style.cssText = `position:absolute;visibility:hidden;left:-9999px;top:0;font-family:${familie};font-weight:${gewicht};font-style:${stijl};font-size:100px;line-height:normal;white-space:nowrap;padding:0;margin:0;border:0`;
+    t.textContent = 'Hg';
+    d.body.appendChild(t);
+    const r = t.getBoundingClientRect().height / 100;
+    t.remove();
+    return (cache[k] = r > 0.8 && r < 2 ? r : 1.15);
+  };
+  d.body.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6').forEach(el => {
+    const cs = w.getComputedStyle(el);
+    const lh = parseFloat(cs.lineHeight), fs = parseFloat(cs.fontSize);
+    if (!lh || !fs || cs.lineHeight === 'normal') return;
+    const m = lh / fs;
+    // lettertype van de eerste tekst in de alinea
+    let bron = el;
+    const tw = d.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let n; while ((n = tw.nextNode())) if (n.nodeValue.trim()) { bron = n.parentElement; break; }
+    const bs = w.getComputedStyle(bron);
+    el.style.lineHeight = String(Math.round(m * natuurlijk(bs.fontFamily, bs.fontWeight, bs.fontStyle) * 1000) / 1000);
+  });
+}
+
+
+// ── Exacte PDF: Google maakt het ingevulde contract als echte PDF ──
+let _pdfUrl = null, _pdfBezig = false;
+function sluitExactePdf() {
+  const v = document.getElementById('pdf-weergave');
+  if (v) v.hidden = true;
+  const pb = document.getElementById('preview-body');
+  if (pb && pb.hidden) { pb.hidden = false; setTimeout(() => pasZoomToe(), 0); }
+  if (_pdfUrl) { URL.revokeObjectURL(_pdfUrl); _pdfUrl = null; }
+  const inh = document.getElementById('pdf-inhoud');
+  if (inh) inh.innerHTML = '';
+}
+async function exactePdf() {
+  if (_pdfBezig) return;
+  if (!driveCheckReady(true)) return;
+  if (!gsLoadToken()) { showToast('Log eerst in met Google.', true); return; }
+  if (!gsHeeftScope('drive.file')) { showToast('De tool heeft toestemming nodig om tijdelijk een kopie in je Google Drive te maken. Log opnieuw in en sta de toegang toe.', true); gsSignIn(); return; }
+  const v = document.getElementById('pdf-weergave'), inh = document.getElementById('pdf-inhoud'), info = document.getElementById('pdf-info');
+  const knop = document.getElementById('btn-exact');
+  sluitExactePdf();
+  v.hidden = false;
+  document.getElementById('preview-body').hidden = true;
+  info.textContent = 'Exacte PDF van Google';
+  inh.innerHTML = '<div class="pdf-wacht">Google maakt de PDF…<br><span style="font-size:12px">Dit duurt meestal 5 à 10 seconden.</span></div>';
+  _pdfBezig = true;
+  if (knop) { knop.disabled = true; knop.textContent = 'Bezig…'; }
+  let kopieId = null;
+  try {
+    const key = driveCurrentKey();
+    const map = await uitvoerMap();
+    const kopie = await (await driveFetch(`${DRIVE_API}/files/${driveDocIds[key]}/copy?supportsAllDrives=true&fields=id`, { json: { name: 'Voorbeeld (tijdelijk) – ' + (DOC_KAART[key]?.naam || key), parents: [map] } })).json();
+    kopieId = kopie.id;
+    const onbekend = await vulDocument(kopieId, key, contractData(), contractVlaggen());
+    const blob = await (await driveFetch(`${DRIVE_API}/files/${kopieId}/export?mimeType=application/pdf`)).blob();
+    if (v.hidden) return;   // intussen gesloten
+    _pdfUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+    inh.innerHTML = '';
+    const f = document.createElement('iframe');
+    f.title = 'Exacte PDF van het contract';
+    f.src = _pdfUrl + '#view=FitH';
+    inh.appendChild(f);
+    const tijd = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    info.textContent = `Exacte PDF van Google · ${tijd}` + (onbekend && onbekend.length ? ` · ${onbekend.length} plek(ken) nog rood` : '');
+  } catch (e) {
+    inh.innerHTML = `<div class="pdf-wacht fout">De PDF kon niet worden gemaakt.<br>${escHtml(e.message)}</div>`;
+  } finally {
+    _pdfBezig = false;
+    if (knop) { knop.disabled = false; knop.textContent = 'Exacte PDF'; }
+    // De tijdelijke kopie meteen weer weghalen
+    if (kopieId) driveFetch(`${DRIVE_API}/files/${kopieId}?supportsAllDrives=true`, { method: 'DELETE' }).catch(() => {});
+  }
+}
+// Pas je iets aan of kies je een ander document, dan weer het snelle voorbeeld
+const _schedVoorPdf = scheduleLivePreview;
+scheduleLivePreview = function () { if (!_pdfBezig) sluitExactePdf(); return _schedVoorPdf.apply(this, arguments); };
 
 // ── Live preview: update terwijl gebruiker typt ──
 (function() {
