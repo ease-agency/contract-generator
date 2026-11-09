@@ -4481,6 +4481,7 @@ function stapTerug() { naarStap(UI.stap - 1); }
 // Terugknop van de browser: één stap (of scherm) terug in plaats van de tool verlaten
 let _histStil = false;
 function histZet(vervang) {
+  uiBewaar();
   if (_histStil) return;
   const st = { ease: 1, view: UI.view, stap: UI.stap };
   try {
@@ -4867,6 +4868,41 @@ ga = function (view) { if (CONTROLE.aan && view !== 'nieuw') controleStop(false)
 const _naarStapVoorControle = naarStap;
 naarStap = function (n) { if (CONTROLE.aan && n !== 3) controleStop(false); return _naarStapVoorControle.apply(this, arguments); };
 
+
+// ── Na het vernieuwen van de pagina terug naar waar je was ──
+// Alleen het scherm, de stap, het document en het nummer van de PA in de lijst; geen persoonsgegevens.
+let _herstellen = false;
+const _uiOpgeslagen = (() => { try { return sessionStorage.getItem('ease_ui'); } catch (e) { return null; } })();
+function uiBewaar() {
+  if (_herstellen || CONTROLE.aan) return;
+  const nr = selectedPA ? paDatabase.indexOf(selectedPA) : -1;
+  try { sessionStorage.setItem('ease_ui', JSON.stringify({ view: UI.view, stap: Math.min(UI.stap, 3), voor: UI.voor, doc: UI.stap >= 3 ? driveCurrentKey() : null, pa: nr, zonderPA: !!UI.zonderPA })); } catch (e) {}
+}
+function uiHerstel() {
+  let st = null;
+  try { st = JSON.parse(_uiOpgeslagen || 'null'); } catch (e) {}
+  if (!st || !st.view) return;
+  if (st.view !== 'nieuw') { ga(st.view); return; }
+  if (!st.stap || st.stap < 2) return;
+  const verder = () => {
+    _herstellen = true;
+    try {
+      if (st.voor === 'klant') { UI.voor = 'klant'; naarStap(2); }
+      else if (st.pa >= 0 && paDatabase[st.pa]) kiesPA(paDatabase[st.pa].id);
+      else { UI.voor = 'pa'; UI.zonderPA = true; naarStap(2); }
+      if (st.stap >= 3 && st.doc && DOC_KAART[st.doc]) kiesDocument(st.doc);
+    } finally { _herstellen = false; uiBewaar(); }
+  };
+  // Is er een PA gekozen, wacht dan tot de PA-lijst uit de Sheet is geladen (max. 20 seconden)
+  if (st.voor !== 'klant' && st.pa >= 0 && !paDatabase.length && gsLoadToken()) {
+    _herstellen = true;
+    const start = Date.now();
+    const t = setInterval(() => {
+      if (paDatabase.length || Date.now() - start > 20000) { clearInterval(t); _herstellen = false; if (UI.view === 'nieuw' && UI.stap === 1) verder(); }
+    }, 300);
+  } else verder();
+}
+
 // ── Live preview: update terwijl gebruiker typt ──
 (function() {
   const vg = document.getElementById('view-generator');
@@ -4880,6 +4916,7 @@ naarStap = function (n) { if (CONTROLE.aan && n !== 3) controleStop(false); retu
   // Starten bij Nieuw contract (stap 1 = de PA-lijst)
   switchTab('pa');
   ga('nieuw');
+  uiHerstel();
 })();
 </script>
 
