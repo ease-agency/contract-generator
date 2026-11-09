@@ -3645,6 +3645,17 @@ function vulTemplateHtml(html, key, data, vlaggen) {
     vervangInElement(el, /(€\s?)?\{\{\s*([^{}]+?)\s*\}\}/g, m => { const v = variabeleVoor(m[2], bekend); if (!v) return m[0]; const w = String(data[v] ?? '').trim(); return (m[1] && /^€/.test(w) ? '' : (m[1] || '')) + '\uE001' + (w || '…………') + '\uE002'; });
   });
 
+  {
+    const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    const tabNodes = [];
+    let tn;
+    while ((tn = tw.nextNode())) if (/ {8}/.test(tn.nodeValue)) tabNodes.push(tn);
+    tabNodes.forEach(n => {
+      n.nodeValue = n.nodeValue.replace(/ {8}/g, '\t');
+      const blok = n.parentElement && n.parentElement.closest('p, li, h1, h2, h3, h4, h5, h6');
+      if (blok) { blok.style.whiteSpace = 'pre-wrap'; blok.style.tabSize = '36pt'; }
+    });
+  }
   markeerIngevuld(doc);
   markeerOnbekend(doc);
   previewLettertypes(doc);
@@ -3830,6 +3841,18 @@ function pagineerVoorbeeld(d, w) {
   const achtergrond = cs.backgroundColor;
   d.querySelectorAll('a[id^="cmnt"]').forEach(a => { const dv = a.closest('div'); if (dv && dv.parentElement === body) dv.remove(); });
   d.querySelectorAll('a[href^="#cmnt"]').forEach(a => (a.closest('sup') || a).remove());
+  body.querySelectorAll('hr').forEach(hr => {
+    if (!/page-break/i.test(hr.getAttribute('style') || '')) return;
+    while (hr.parentElement && hr.parentElement !== body) {
+      const ouder = hr.parentElement;
+      const rest = ouder.cloneNode(false);
+      rest.removeAttribute('id');
+      while (hr.nextSibling) rest.appendChild(hr.nextSibling);
+      ouder.after(hr);
+      if (rest.childNodes.length) hr.after(rest);
+      if (!ouder.childNodes.length || (!ouder.textContent.trim() && !ouder.querySelector('img, table, hr'))) ouder.remove();
+    }
+  });
   const kinderen = [...body.children].filter(el => !/^(SCRIPT|STYLE|LINK|META)$/.test(el.tagName));
   if (kinderen.length < 2) return;
   let kop = null, voet = null;
